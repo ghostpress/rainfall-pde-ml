@@ -4,6 +4,7 @@ import os
 
 data_dir = ""
 dest_dir = ""
+files,folders = 0,0
 
 print("Configuring data processing environment.")
 
@@ -25,7 +26,6 @@ else:
     # Next, the destination directory:
     dest_dir += input("Enter the output directory, eg. './data/out/' to hold the processed data files when done: ")
 
-    files,folders = 0,0
     for _, dirnames, filenames in os.walk(data_dir):
         files += len(filenames)
         folders += len(dirnames)
