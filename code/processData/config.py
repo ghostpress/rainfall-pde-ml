@@ -1,4 +1,4 @@
-# --------- CONFIGURATION FILE FOR DATA PROCESSING ----------
+# --------- CONFIGURATION SCRIPT FOR DATA PROCESSING ----------
 
 import os
 
@@ -37,6 +37,8 @@ else:
     with open("config.txt", "w") as f:
         f.write(data_dir + "\n")
         f.write(dest_dir + "\n")
+        f.write(str(files) + "\n")
+        f.write(str(folders) + "\n")
 
     print("Configuration complete for processing {:,} files, {:,} folders in %s".format(files, folders) % data_dir)
     
