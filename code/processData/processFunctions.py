@@ -3,6 +3,16 @@ import subprocess
 
 # TODO: don't assume number of subdirectories, try checking how many there are and/or using recursion to descend
 
+def read_config_file():
+
+    print("Reading config settings...")
+
+    with open("config.txt", "r") as f:
+        lines = [line.rstrip() for line in f]
+
+    return lines
+        
+
 def process_files(wd, commands, out_name, dest_dir):
 
     print("Working directory: %s " % wd)

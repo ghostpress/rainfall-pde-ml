@@ -38,7 +38,7 @@ else:
         f.write(data_dir + "\n")
         f.write(dest_dir + "\n")
         f.write(str(files) + "\n")
-        f.write(str(folders) + "\n")
+        f.write(str(folders - 1) + "\n") # os.walk() counts top folder
 
     print("Configuration complete for processing {:,} files, {:,} folders in %s".format(files, folders) % data_dir)
     
