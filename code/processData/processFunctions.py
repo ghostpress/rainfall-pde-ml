@@ -1,8 +1,6 @@
 import os
 import subprocess
 
-# TODO: don't assume number of subdirectories, try checking how many there are and/or using recursion to descend
-
 def read_config_file():
 
     print("Reading config settings...")
@@ -13,20 +11,13 @@ def read_config_file():
     return lines
         
 
-def process_files(wd, commands, out_name, dest_dir):
-
-    print("Working directory: %s " % wd)
-    
-    for f in os.listdir(wd):
-
-        assert os.path.isfile(f), "Can't run CDO commands on a directory, check that your config.txt is correct."
+def process_file(f, commands, out_name, dest_dir):
+    assert os.path.isfile(f), "Can't run CDO commands on a directory."
         
-        print("Processing: %s" % f)
+    print("Processing %s" % f)
 
-        fname = out_name + f[-26:-18] + ".nc"
-        exe = commands.append(fname, wd+"/"+f, dest_dir+"/"+out_name)
+    fname = out_name + f[-26:-18] + ".nc"
+    exe = commands.extend([f, dest_dir+"/"+fname])
+    out = subprocess.run(commands)
 
-        out = subprocess.run(commands)
-        print("Exit code: %d" % out.returncode)
-
-    return    
+    return out.returncode
