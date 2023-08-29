@@ -1,12 +1,5 @@
-# Machine Learning and PDEs to predict rainfall
+# Machine Learning and PDEs to predict rainfall in Ghana
 Work done at the FORMES research group under Dr. Yves Atchade at Boston University.
-
-TODOs:
-- Implement ocean SST PDE in Python PDE solver (eg. py-pde)
-- Generate simulation data from PDE solver
-- Implement U-Net model in PyTorch
-- Implement warping scheme
-- Use U-Net to predict future state of SST PDE
 
 ## References:
 
