@@ -27,7 +27,6 @@ class DataLoader():
         self.ValLoader = None
         self.TestLoader = None
 
-
     def all_days(self, files):
         """Helper method to take a list of filenames and return total the number 
            of days represented by the files in the list. 
