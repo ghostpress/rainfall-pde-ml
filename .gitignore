@@ -2,6 +2,7 @@ data/
 experiments/
 
 .ipynb_checkpoints/
+.idea/
 __pycache__/
 
 config.txt
