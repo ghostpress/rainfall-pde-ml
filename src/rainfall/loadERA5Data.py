@@ -25,6 +25,8 @@ E5_masked.add_to_variable("t2m", -273.15)  # temperature: K -> degrees C
 # Save to file
 E5_filled.save_to_file(outdir, "tp")
 E5_filled.save_to_file(outdir, "t2m")
+E5_filled.save_to_file(outdir, "latitude")
+E5_filled.save_to_file(outdir, "longitude")
 # E5_masked.save_to_file(outdir, "tp")  # MaskedArray.tofile() not implemented yet
 # E5_masked.save_to_file(outdir, "t2m") # MaskedArray.tofile() not implemented yet
 
