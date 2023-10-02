@@ -2,6 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import datetime
 import torch
+import os
+import math
+# TODO: reorganize imports
 
 
 class SatelliteDataLoader:
@@ -26,20 +29,74 @@ class SatelliteDataLoader:
         self.ValLoader = None
         self.TestLoader = None
 
-    def get_date_from_filename(self):
+    def get_date_from_filename(self, file):
         raise NotImplementedError("Please implement this method.")
 
     def get_total_time_passed(self, files):
-        # TODO: update to use naming convention
+        raise NotImplementedError("Please implement this method.")
         pass
 
     def train_val_test_cutoffs(self):
-        # TODO: update to use naming convention
-        pass
+        """Helper method to create lists of filenames for the train, val, and test data splits. Uses the dates in the
+        filenames to determine file order and split cutoffs.
+
+        Returns
+        -------
+        cutoffs : list : date cutoffs for each split
+        """
+
+        all_files = os.listdir(self.path)
+        all_files.sort()
+        nfiles = len(all_files)
+        ntimes = self.get_total_time_passed(all_files)
+
+        start_date = self.get_date_from_filename(all_files[0])
+        end_date = self.get_date_from_filename(all_files[nfiles - 1])
+
+        cutoffs = []
+
+        for i in range(3):
+            delta = math.floor(ntimes * self.split[i])
+            end = start_date + datetime.timedelta(days=delta)  # TODO: test that this works with ERA5 data
+            cutoffs.append(end)
+
+            start_date = end
+
+        # Because of rounding, some files may have been missed
+        # Add these to the test split
+        if cutoffs[2] < end_date:
+            cutoffs[2] = end_date
+
+        return cutoffs
 
     def train_val_test_split_files(self):
-        # TODO: update to use naming convention
-        pass
+        """Method to split the data in a directory into training, validation, and test sets. Uses the helper method
+        train_val_test_cutoffs().
+        """
+        assert len(self.split) == 3, "Please include a % split for train, validation, and test sets."
+
+        cutoffs = self.train_val_test_cutoffs()
+
+        all_files = os.listdir(self.path)
+        all_files.sort()
+
+        train, val, test = [], [], []
+
+        for f in all_files:
+            file_date = self.get_date_from_filename(f)
+
+            if file_date <= cutoffs[0]:
+                train.append(f)
+            elif (file_date > cutoffs[0]) & (file_date <= cutoffs[1]):
+                val.append(f)
+            else:
+                test.append(f)
+
+        self.train_files = train
+        self.val_files = val
+        self.test_files = test
+
+        return
 
     def load_data_from_file(self, filename):
         """Helper method to load a single .npy file."""
@@ -85,7 +142,8 @@ class SatelliteDataLoader:
 
         first_, next_ = next(iter(training_loader))
 
-        print("Training data: \n %d batches of size %d \n %d images" %(len(training_loader), self.batchsize, len(self.train_files)))
+        print("Training data: \n %d batches of size %d \n %d images" % (len(training_loader), self.batchsize,
+                                                                        len(self.train_files)))
         print("Data shape: \n X: " + str(first_.shape) + ", y: " + str(next_.shape))
 
         print("Example image:")
@@ -100,7 +158,8 @@ class SatelliteDataLoader:
 
         first_, next_ = next(iter(validation_loader))
 
-        print("Validation data: \n %d batches of size %d \n %d images" % (len(validation_loader), self.batchsize, len(self.val_files)))
+        print("Validation data: \n %d batches of size %d \n %d images" % (len(validation_loader), self.batchsize,
+                                                                          len(self.val_files)))
         print("Data shape: \n X: " + str(first_.shape) + ", y: " + str(next_.shape))
 
         print("Example image:")
@@ -115,7 +174,8 @@ class SatelliteDataLoader:
 
         first_, next_ = next(iter(test_loader))
 
-        print("Test data: \n %d batches of size %d \n %d images" % (len(test_loader), self.batchsize, len(self.test_files)))
+        print("Test data: \n %d batches of size %d \n %d images" % (len(test_loader), self.batchsize,
+                                                                    len(self.test_files)))
         print("Data shape: \n X: " + str(first_.shape) + ", y: " + str(next_.shape))
 
         print("Example image:")
