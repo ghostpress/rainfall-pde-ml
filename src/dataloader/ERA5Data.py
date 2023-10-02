@@ -20,10 +20,6 @@ class ERA5Data:
         self.files = self.get_files()
         self.print_info()
 
-        # Note: assumes that the geographic area of the data will remain the same throughout the project
-        self.latitude = nc.Dataset(self.files[0]).variables["latitude"][:].data
-        self.longitude = nc.Dataset(self.files[0]).variables["longitude"][:].data
-
         self.time = self.get_time()
         self.variable_series = dict()
         pass
@@ -127,23 +123,49 @@ class ERA5Data:
 
         pass
 
-    def save_to_file(self, outdir, variable):
+    def save_to_file(self, outdir, variable, one_series=True):
         print("Saving data to files in", outdir)
 
-        if variable in self.variable_series.keys():
-            date_min = self.time[0].strftime("%Y-%m-%d")
-            date_max = self.time[-1].strftime("%Y-%m-%d")
-            fname = variable + "_" + "6h" + "_" + date_min + "_" + date_max
+        if one_series:
+            print("Saving one series.")
+            if variable in self.variable_series.keys():
+                date_min = self.time[0].strftime("%Y-%m-%d")
+                date_max = self.time[-1].strftime("%Y-%m-%d")
+                fname = variable + "_" + "6h" + "_" + date_min + "_" + date_max
 
-            if self.use_mask:
-                fname += "_masked.npy"
+                if self.use_mask:
+                    fname += "_masked.npy"
+                else:
+                    fname += "_filled.npy"
+
+                np.save(outdir + fname, self.variable_series[variable])
+
             else:
-                fname += "_filled.npy"
-
-            np.save(outdir + fname, self.variable_series[variable])
-
+                self.create_series(variable)
+                self.save_to_file(outdir, variable, one_series)
         else:
-            self.create_series(variable)
-            self.save_to_file(outdir, variable)
+            print("Saving individual daily files.")
+            if variable in self.variable_series.keys():
+                date_min = self.time[0]
+                var_series = self.variable_series[variable]
+                current_date = date_min
+                i = 0
+
+                while i < len(var_series):
+                    day_arr = var_series[i:i+4, :, :]
+                    fname = variable + "_fullDay_" + current_date.strftime("%Y%m%d")
+
+                    if self.use_mask:
+                        fname += "_masked.npy"
+                    else:
+                        fname += "_filled.npy"
+
+                    np.save(outdir + fname, day_arr)
+                    i += 4
+                    current_date = current_date + datetime.timedelta(days=1)
+
+            else:
+                self.create_series(variable)
+                self.save_to_file(outdir, variable, one_series)
 
         pass
