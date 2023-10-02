@@ -1,20 +1,17 @@
-import matplotlib.pyplot as plt
-import numpy as np
 import datetime
-import torch
-import os
 import math
-# TODO: reorganize imports
+import numpy as np
+import os
+import torch
 
 
 class WeatherDataLoader:
 
-    def __init__(self, topdir, naming_conv, data_split, batchsize, timebase, hist=1, shuffle=True):
+    def __init__(self, topdir, naming_conv, data_split, batchsize, hist=1, shuffle=True):
         self.parent_dir = topdir
         self.file_naming_convention = naming_conv
         self.split = data_split
         self.batchsize = batchsize
-        self.timebase = timebase  # variable to determine whether each file represents one day, one hour, etc.
         self.history = hist
         self.shuffle = shuffle
 
@@ -30,6 +27,9 @@ class WeatherDataLoader:
         self.TestLoader = None
 
     def get_date_from_filename(self, file):
+        raise NotImplementedError("Please implement this method for each subclass.")
+
+    def plot_example_image(self, arr):
         raise NotImplementedError("Please implement this method for each subclass.")
 
     def all_days(self, files):
@@ -64,7 +64,7 @@ class WeatherDataLoader:
 
         for i in range(3):
             delta = math.floor(ndays * self.split[i])
-            end = start_date + datetime.timedelta(days=delta)  # TODO: test that this works with ERA5 data
+            end = start_date + datetime.timedelta(days=delta)
             cutoffs.append(end)
 
             start_date = end
@@ -158,10 +158,7 @@ class WeatherDataLoader:
         print("Training data: \n %d batches of size %d \n %d images" % (len(training_loader), self.batchsize,
                                                                         len(self.train_files)))
         print("Data shape: \n X: " + str(first_.shape) + ", y: " + str(next_.shape))
-
-        print("Example image:")
-        plt.imshow(first_[0][0])
-        plt.show()
+        self.plot_example_image(first_)
 
         return
 
@@ -174,10 +171,7 @@ class WeatherDataLoader:
         print("Validation data: \n %d batches of size %d \n %d images" % (len(validation_loader), self.batchsize,
                                                                           len(self.val_files)))
         print("Data shape: \n X: " + str(first_.shape) + ", y: " + str(next_.shape))
-
-        print("Example image:")
-        plt.imshow(first_[0][0])
-        plt.show()
+        self.plot_example_image(first_)
 
         return
 
@@ -190,9 +184,6 @@ class WeatherDataLoader:
         print("Test data: \n %d batches of size %d \n %d images" % (len(test_loader), self.batchsize,
                                                                     len(self.test_files)))
         print("Data shape: \n X: " + str(first_.shape) + ", y: " + str(next_.shape))
-
-        print("Example image:")
-        plt.imshow(first_[0][0])
-        plt.show()
+        self.plot_example_image(first_)
 
         return

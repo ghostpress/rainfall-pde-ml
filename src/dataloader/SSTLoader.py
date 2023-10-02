@@ -1,14 +1,10 @@
 import datetime
+import matplotlib.pyplot as plt
 import numpy as np
+from src.dataloader import WeatherDataLoader
 
-import src.dataloader
 
-
-class SSTLoader(src.dataloader.WeatherDataLoader):
-
-    def __init__(self):
-        super().__init__()
-        pass
+class SSTLoader(WeatherDataLoader.WeatherDataLoader):
 
     def get_date_from_filename(self, fname):
         assert(self.file_naming_convention == "NEMO_npy")
@@ -117,3 +113,8 @@ class SSTLoader(src.dataloader.WeatherDataLoader):
             final_ends.append(reg_ends)
 
         return np.array(final_inps), np.array(final_ends)
+
+    def plot_example_image(self, arr):
+        print("Example image:")
+        plt.imshow(arr[0][0])
+        plt.show()
