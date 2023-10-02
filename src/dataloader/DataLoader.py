@@ -28,7 +28,7 @@ class DataLoader():
         self.TestLoader = None
 
     def all_days(self, files):
-        """Helper method to take a list of filenames and return total the number 
+        """Helper method to take a list of filenames and return the total number
            of days represented by the files in the list. 
     
            This method assumes a particular file naming convention that has been used 
@@ -136,6 +136,7 @@ class DataLoader():
         
         return np.array(data)
 
+    # Note: this method unique to SSTLoader
     def search_by_region(self, files, region):
         """Helper method to search a list of files for only those corresponding to
            a desired region. 
@@ -225,13 +226,13 @@ class DataLoader():
                     regions.append(int(reg))
             
             else:
-                print("Files in this directory do not match the naming convention.")
+                raise ValueError("Files in this directory do not match the naming convention.")
     
         regions.sort()
     
         return regions
 
-    def create_dataloader(self, files, dtype=torch.FloatTensor, all_data=True, regs=None):
+    def create_dataloader(self, files, dtype=torch.FloatTensor):
         """Method to create a PyTorch DataLoader object from a list of files and
         additional parameters.
     
@@ -239,18 +240,12 @@ class DataLoader():
         ----------
         files : str : a list of files holding data to put into the DataLoader
         dtype : torch.dtype : the data type for the DataLoader
-        all_data : Boolean : whether to use all the data or a subset of the data
-        regs : list : a list of regions for which to create a dataset, if not all 
     
         Returns
         -------
         loader : torch.utils.data.DataLoader : the DataLoader object
         """
-    
-        if all_data:
-            regions = self.all_regions(files)
-        else:
-            regions = regs
+        regions = self.all_regions(files)
 
         data = []
         ends = []
@@ -268,7 +263,8 @@ class DataLoader():
         final_data = torch.from_numpy(np.array(data)).type(dtype)
         final_ends = torch.from_numpy(np.array(ends)).type(dtype)
     
-        loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(final_data, final_ends), batch_size=self.batchsize, shuffle=self.shuffle)
+        loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(final_data, final_ends),
+                                             batch_size=self.batchsize, shuffle=self.shuffle)
     
         return loader
 
