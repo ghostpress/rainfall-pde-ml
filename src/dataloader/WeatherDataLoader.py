@@ -7,7 +7,7 @@ import math
 # TODO: reorganize imports
 
 
-class SatelliteDataLoader:
+class WeatherDataLoader:
 
     def __init__(self, topdir, naming_conv, data_split, batchsize, timebase, hist=1, shuffle=True):
         self.parent_dir = topdir
@@ -30,10 +30,17 @@ class SatelliteDataLoader:
         self.TestLoader = None
 
     def get_date_from_filename(self, file):
-        raise NotImplementedError("Please implement this method.")
+        raise NotImplementedError("Please implement this method for each subclass.")
 
-    def get_total_time_passed(self, files):
-        raise NotImplementedError("Please implement this method.")
+    def all_days(self, files):
+        files.sort()
+
+        first = self.get_date_from_filename(files[0])
+        last = self.get_date_from_filename(files[len(files) - 1])
+
+        delta = int((last - first) / datetime.timedelta(days=1))
+
+        return delta
         pass
 
     def train_val_test_cutoffs(self):
@@ -45,10 +52,10 @@ class SatelliteDataLoader:
         cutoffs : list : date cutoffs for each split
         """
 
-        all_files = os.listdir(self.path)
+        all_files = os.listdir(self.parent_dir)
         all_files.sort()
         nfiles = len(all_files)
-        ntimes = self.get_total_time_passed(all_files)
+        ndays = self.all_days(all_files)
 
         start_date = self.get_date_from_filename(all_files[0])
         end_date = self.get_date_from_filename(all_files[nfiles - 1])
@@ -56,7 +63,7 @@ class SatelliteDataLoader:
         cutoffs = []
 
         for i in range(3):
-            delta = math.floor(ntimes * self.split[i])
+            delta = math.floor(ndays * self.split[i])
             end = start_date + datetime.timedelta(days=delta)  # TODO: test that this works with ERA5 data
             cutoffs.append(end)
 
@@ -77,7 +84,7 @@ class SatelliteDataLoader:
 
         cutoffs = self.train_val_test_cutoffs()
 
-        all_files = os.listdir(self.path)
+        all_files = os.listdir(self.parent_dir)
         all_files.sort()
 
         train, val, test = [], [], []
@@ -100,7 +107,7 @@ class SatelliteDataLoader:
 
     def load_data_from_file(self, filename):
         """Helper method to load a single .npy file."""
-        return np.load(self.path + "/" + filename)
+        return np.load(self.parent_dir + "/" + filename)
 
     def load_data_from_files(self, files):
         """Method to load data from a list of .npy files."""
@@ -111,11 +118,17 @@ class SatelliteDataLoader:
         return np.array(data)
 
     def get_pairs(self, files):
-        # TODO: basic version assumes files represent one region; inherited version customized to region and uses helper method
-        pass
+        n = len(files)
+
+        inps = []
+        ends = files[self.history:]
+
+        for i in range(n - self.history):
+            inps.append(files[i:i + self.history])
+
+        return np.array(inps), np.array(ends)
 
     def create_dataloader(self, files, dtype=torch.FloatTensor):
-        # TODO: basic version assumes files represent one region; inherited version customized to region and uses helper method
         data = []
         ends = []
 
