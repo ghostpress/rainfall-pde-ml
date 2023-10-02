@@ -1,7 +1,7 @@
+import datetime
 import os
 import netCDF4 as nc
 import numpy as np
-import datetime
 
 
 class ERA5Data:
