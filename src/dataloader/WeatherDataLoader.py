@@ -27,12 +27,36 @@ class WeatherDataLoader:
         self.TestLoader = None
 
     def get_date_from_filename(self, file):
+        """Helper method to take a filename containing a date string and return the date as a datetime.datetime object.
+        Implemented by each subclass because the file naming convention used for each dataset is different.
+
+        Parameters
+        ----------
+        file : str : filename
+        """
         raise NotImplementedError("Please implement this method for each subclass.")
 
     def plot_example_image(self, arr):
+        """Helper method to take a multidimensional array or Tensor from a dataloader and plot the image embedded
+        within. Implemented by each subclass because the dimensions of the data differ.
+
+        Parameters
+        ----------
+        arr : torch.Tensor : array containing image to plot
+        """
         raise NotImplementedError("Please implement this method for each subclass.")
 
     def all_days(self, files):
+        """Helper method to take a list of filenames and return the total number of days represented by the files in
+        the list.
+
+        Parameters
+        ----------
+        files : list : list of filenames
+        Returns
+        -------
+        delta : int : the number of days represented by the inputted files
+        """
         files.sort()
 
         first = self.get_date_from_filename(files[0])
@@ -118,6 +142,18 @@ class WeatherDataLoader:
         return np.array(data)
 
     def get_pairs(self, files):
+        """Method to separate data into inputs (X) and ends (y), for example to use 4 previous days (hist=4) to
+        predict the next day. The "pairs" are pairs of (X,y) inputs and ends.
+
+        Parameters
+        ----------
+        files : list : list of files from which to get pairs
+
+        Returns
+        -------
+        inps : np.ndarray : filenames for inputs
+        ends : list : filenames for ends
+        """
         n = len(files)
 
         inps = []
