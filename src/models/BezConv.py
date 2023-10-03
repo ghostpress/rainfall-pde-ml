@@ -22,6 +22,8 @@ def initialize_weights(*models):
                 module.bias.data.zero_()
 
 
+# TODO: move these classes and the method above to a separate file, eg. components.py
+
 class _EncoderBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(_EncoderBlock, self).__init__()
@@ -103,26 +105,20 @@ class _CenterBlock(nn.Module):
 
 
 class BezConv(nn.Module):
-    """Class to implement a physics-driven Convolution-Deconvolution Neural
-        Network (CDNN) as described in (de Bezenac et al, 2019). This model
-        takes as input historical image(s) of Sea Surface Temperature (SST)
-        data, X, and uses a convolutional neural network (CNN) to estimate the
-        wind vector field W that drives the motion of X. From there, the next
-        image is predicted using a "warping" of the most recent input image and W,
-        as if to see how the SST variable evolves with the wind.
-
-        The "warping" in this paper is a radial basis function kernel, or a
-        Gaussian centered in X-W. Other models we will implement later may use a
-        different warping scheme.
-        """
+    """Class to implement a physics-driven Convolution-Deconvolution Neural Network (CDNN) as described in
+    (de Bezenac et. al., 2019). This model takes as input historical 2D image(s) of a weather variable, X, and uses a
+    convolutional neural network (CNN) to estimate the wind vector field W that drives the motion of X. From there, the
+    next image is predicted using a "warping" of the most recent input image and W, as if to see how the variable
+    evolves with the wind. The "warping" in this paper is a radial basis function kernel, or a Gaussian centered in X-W.
+    """
 
     def __init__(self, device, hist=1):
         """Function to construct the model.
 
-           Parameters
-           ----------
-           device : torch.device : device on which to perform computations
-           hist : int : the number of days of "history" to use for prediction, default = 1.
+        Parameters
+        ----------
+        device : torch.device : device on which to perform computations
+        hist : int : the number of days of "history" to use for prediction, default = 1.
         """
 
         super(BezConv, self).__init__()
@@ -176,13 +172,11 @@ class BezConv(nn.Module):
 
     @staticmethod
     def kernel(distsq, D, dt):
-        """Method to implement the k() function or radial basis function kernel
-        described above.
+        """Method to implement the k() function or radial basis function kernel described in (de Bezenac et. al., 2019).
 
         Parameters
         ----------
-        distsq : float or torch.FloatTensor : the value of the squared norm of
-                 the distance
+        distsq : float or torch.FloatTensor : the value of the squared norm of the distance
         D : float : the diffusion coefficient
         dt : float : the timestep
 
@@ -195,8 +189,8 @@ class BezConv(nn.Module):
         return res
 
     def warp(self, image, W, hist):
-        """Function to compute the warping of the input data and an estimated
-        wind vector field, in order to produce an output predicted image.
+        """Function to compute the warping of the input data and an estimated wind vector field, in order to produce an
+        output predicted image.
 
         Parameters
         ----------
@@ -214,10 +208,10 @@ class BezConv(nn.Module):
 
         interval = torch.arange(image.size()[-1]).type(torch.FloatTensor)
 
-        x1 = interval[None, :, None, None, None] #.to(self.device)
-        x2 = interval[None, None, :, None, None] #.to(self.device)
-        y1 = interval[None, None, None, :, None] #.to(device)
-        y2 = interval[None, None, None, None, :] #.to(device)
+        x1 = interval[None, :, None, None, None]  # .to(self.device)
+        x2 = interval[None, None, :, None, None]  # .to(self.device)
+        y1 = interval[None, None, None, :, None]  # .to(device)
+        y2 = interval[None, None, None, None, :]  # .to(device)
 
         # x - wind - y
         distsq = (x1 - y1 - W[:, 0, :, :, None, None]) ** 2 + (x2 - y2 - W[:, 1, :, :, None, None]) ** 2
@@ -227,13 +221,11 @@ class BezConv(nn.Module):
         return warped
 
     def forward(self, x):
-        """Function to execute the forward pass of the model. All of the
-        computations are done in the methods above, so this function
-        simply returns their outputs.
+        """Function to execute the forward pass of the model. All the computations are done in the methods above,
+        so this function simply returns their outputs.
 
-        Note: the wind vector field W is returned for use in the
-        regularized loss function later. For simple difference loss
-        functions, returning y_pred is sufficient.
+        Note: the wind vector field W is returned for use in the regularized loss function later. For simple difference
+        loss functions, returning y_pred is sufficient.
 
         Parameters
         ----------
@@ -251,23 +243,24 @@ class BezConv(nn.Module):
         return W, y_pred
 
     @staticmethod
-    def compute_regloss(F, device, dtype=torch.FloatTensor):
-        gradient = reduce(torch.add, torch.gradient(F))
+    def compute_regloss(f, dtype=torch.FloatTensor):
+        gradient = reduce(torch.add, torch.gradient(f))
 
-        magnitude = torch.Tensor([torch.mean(torch.linalg.norm(F, axis=0, ord=2) ** 2)]).to(device)
-        divergence = torch.Tensor([torch.mean(gradient.sum(0)**2)]).to(device)
-        smoothness = torch.Tensor([torch.mean(torch.linalg.norm(gradient, axis=0, ord=2)**2)]).to(device)
+        magnitude = torch.Tensor([torch.mean(torch.linalg.norm(f, axis=0, ord=2) ** 2)]).to(BezConv.device)
+        divergence = torch.Tensor([torch.mean(gradient.sum(0)**2)]).to(BezConv.device)
+        smoothness = torch.Tensor([torch.mean(torch.linalg.norm(gradient, axis=0, ord=2)**2)]).to(BezConv.device)
 
         # TODO: check dimensions of divergence and smoothness
         return magnitude.type(dtype)[0], divergence.type(dtype), smoothness.type(dtype)
 
     @staticmethod
-    def loss(y_pred, y, device, w=None, reg=False, coeffs=[0,0,0]):
+    def loss(y_pred, y, reg_coeffs, w=None, reg=False):
+        assert(len(reg_coeffs) == 3)
         error = torch.sum((y_pred - y)**2, axis=1)
         loss = torch.mean(error)
 
         if reg:
-            for c in coeffs:
+            for c in reg_coeffs:
                 reg_term = BezConv.compute_regloss(w[0, :, :, :])
                 loss += c * reg_term
 
