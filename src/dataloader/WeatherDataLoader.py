@@ -7,13 +7,12 @@ import torch
 
 class WeatherDataLoader:
 
-    def __init__(self, topdir, naming_conv, data_split, batchsize, hist=1, shuffle=True):
+    def __init__(self, topdir, naming_conv, data_split, batchsize, hist=1):
         self.parent_dir = topdir
         self.file_naming_convention = naming_conv
         self.split = data_split
         self.batchsize = batchsize
         self.history = hist
-        self.shuffle = shuffle
 
         # Fields to create and save later
         self.train_files = None
@@ -141,7 +140,7 @@ class WeatherDataLoader:
 
         return np.array(data)
 
-    def get_pairs(self, files):
+    def __get_pairs(self, files):
         """Method to separate data into inputs (X) and ends (y), for example to use 4 previous days (hist=4) to
         predict the next day. The "pairs" are pairs of (X,y) inputs and ends.
 
@@ -164,11 +163,11 @@ class WeatherDataLoader:
 
         return np.array(inps), np.array(ends)
 
-    def create_dataloader(self, files, dtype=torch.FloatTensor):
+    def create_dataloader(self, files, dtype=torch.FloatTensor, shuffle=True):
         data = []
         ends = []
 
-        pairs = self.get_pairs(files)
+        pairs = self.__get_pairs(files)
 
         for i in range(len(pairs[0])):
             dat = self.load_data_from_files(pairs[0][i])
@@ -181,12 +180,12 @@ class WeatherDataLoader:
         final_ends = torch.from_numpy(np.array(ends)).type(dtype)
 
         loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(final_data, final_ends),
-                                             batch_size=self.batchsize, shuffle=self.shuffle)
+                                             batch_size=self.batchsize, shuffle=shuffle)
 
         return loader
 
-    def create_training(self):
-        training_loader = self.create_dataloader(self.train_files)
+    def create_training(self, shuffle=True):
+        training_loader = self.create_dataloader(self.train_files, shuffle=shuffle)
         self.TrainLoader = training_loader
 
         first_, next_ = next(iter(training_loader))
@@ -198,8 +197,8 @@ class WeatherDataLoader:
 
         return
 
-    def create_validation(self):
-        validation_loader = self.create_dataloader(self.val_files)
+    def create_validation(self, shuffle=True):
+        validation_loader = self.create_dataloader(self.val_files, shuffle=shuffle)
         self.ValLoader = validation_loader
 
         first_, next_ = next(iter(validation_loader))
@@ -211,8 +210,8 @@ class WeatherDataLoader:
 
         return
 
-    def create_test(self):
-        test_loader = self.create_dataloader(self.test_files)
+    def create_test(self, shuffle=True):
+        test_loader = self.create_dataloader(self.test_files, shuffle=shuffle)
         self.TestLoader = test_loader
 
         first_, next_ = next(iter(test_loader))
