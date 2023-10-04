@@ -112,7 +112,7 @@ class BezConv(nn.Module):
     evolves with the wind. The "warping" in this paper is a radial basis function kernel, or a Gaussian centered in X-W.
     """
 
-    def __init__(self, device, hist=1):
+    def __init__(self, device, coeffs, hist=1):
         """Function to construct the model.
 
         Parameters
@@ -134,9 +134,10 @@ class BezConv(nn.Module):
 
         self.final = nn.Sequential(nn.Conv2d(2, 2, kernel_size=3), )
         initialize_weights(self)
-
-        self.hist = hist
+        
         self.device = device
+        self.coeffs = coeffs
+        self.hist = hist
 
     def wind(self, x):
         """Function to estimate the wind vector field from historical input images.
@@ -208,10 +209,10 @@ class BezConv(nn.Module):
 
         interval = torch.arange(image.size()[-1]).type(torch.FloatTensor)
 
-        x1 = interval[None, :, None, None, None]  # .to(self.device)
-        x2 = interval[None, None, :, None, None]  # .to(self.device)
-        y1 = interval[None, None, None, :, None]  # .to(device)
-        y2 = interval[None, None, None, None, :]  # .to(device)
+        x1 = interval[None, :, None, None, None].to(self.device)
+        x2 = interval[None, None, :, None, None].to(self.device)
+        y1 = interval[None, None, None, :, None].to(self.device)
+        y2 = interval[None, None, None, None, :].to(self.device)
 
         # x - wind - y
         distsq = (x1 - y1 - W[:, 0, :, :, None, None]) ** 2 + (x2 - y2 - W[:, 1, :, :, None, None]) ** 2
@@ -242,26 +243,24 @@ class BezConv(nn.Module):
 
         return W, y_pred
 
-    @staticmethod
-    def compute_regloss(f, dtype=torch.FloatTensor):
+    def compute_regloss(self, f, dtype=torch.FloatTensor):
+        assert(len(self.coeffs) == 3)
         gradient = reduce(torch.add, torch.gradient(f))
 
-        magnitude = torch.Tensor([torch.mean(torch.linalg.norm(f, axis=0, ord=2) ** 2)]).to(BezConv.device)
-        divergence = torch.Tensor([torch.mean(gradient.sum(0)**2)]).to(BezConv.device)
-        smoothness = torch.Tensor([torch.mean(torch.linalg.norm(gradient, axis=0, ord=2)**2)]).to(BezConv.device)
+        magnitude = torch.Tensor([torch.mean(torch.linalg.norm(f, axis=0, ord=2) ** 2)])
+        divergence = torch.Tensor([torch.mean(gradient.sum(0)**2)])
+        smoothness = torch.Tensor([torch.mean(torch.linalg.norm(gradient, axis=0, ord=2)**2)])
+        
+        reg_loss = self.coeffs[0]*magnitude.type(dtype)[0] + self.coeffs[1]*divergence.type(dtype)[0] + self.coeffs[2]*smoothness.type(dtype)[0]
 
-        # TODO: check dimensions of divergence and smoothness
-        return magnitude.type(dtype)[0], divergence.type(dtype), smoothness.type(dtype)
+        return reg_loss
 
-    @staticmethod
-    def loss(y_pred, y, reg_coeffs, w=None, reg=False):
-        assert(len(reg_coeffs) == 3)
+    def loss(self, y_pred, y, w=None, reg=False):
+        assert(len(self.coeffs) == 3)
         error = torch.sum((y_pred - y)**2, axis=1)
         loss = torch.mean(error)
 
         if reg:
-            for c in reg_coeffs:
-                reg_term = BezConv.compute_regloss(w[0, :, :, :])
-                loss += c * reg_term
+            loss += self.compute_regloss(w[0, :, :, :])
 
         return loss
