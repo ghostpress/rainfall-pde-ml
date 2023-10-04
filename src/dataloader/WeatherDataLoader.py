@@ -140,7 +140,7 @@ class WeatherDataLoader:
 
         return np.array(data)
 
-    def get_pairs(self, files):
+    def __get_pairs(self, files):
         """Method to separate data into inputs (X) and ends (y), for example to use 4 previous days (hist=4) to
         predict the next day. The "pairs" are pairs of (X,y) inputs and ends.
 
@@ -168,7 +168,7 @@ class WeatherDataLoader:
         data = []
         ends = []
 
-        pairs = self.get_pairs(files)
+        pairs = self.__get_pairs(files)
 
         for i in range(len(pairs[0])):
             dat = self.load_data_from_files(pairs[0][i])

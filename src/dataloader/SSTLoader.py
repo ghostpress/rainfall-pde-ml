@@ -77,7 +77,7 @@ class SSTLoader(WeatherDataLoader.WeatherDataLoader):
         regions.sort()
         return regions
 
-    def get_pairs(self, files):
+    def __get_pairs(self, files):
         """Method to separate data into inputs (X) and ends (y), for example to use 4 previous days (hist=4) to
         predict the next day. The "pairs" are pairs of (X,y) inputs and ends. This method works on one region at a time.
 
