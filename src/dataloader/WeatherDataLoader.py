@@ -153,7 +153,6 @@ class WeatherDataLoader:
         inps : np.ndarray : filenames for inputs
         ends : list : filenames for ends
         """
-        print("here, in Weather class")
         n = len(files)
 
         inps = []

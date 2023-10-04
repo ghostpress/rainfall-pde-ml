@@ -91,7 +91,6 @@ class SSTLoader(WeatherDataLoader.WeatherDataLoader):
         ends : list : filenames for ends
         """
 
-        print("here, in SST class")
         regions = self.all_regions(files)
         final_inps = []
         final_ends = []
