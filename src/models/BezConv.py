@@ -4,104 +4,9 @@ import torch.nn.functional as F
 import numpy as np
 
 from functools import reduce
-
-
-def initialize_weights(*models):
-    for model in models:
-        for module in model.modules():
-
-            if isinstance(module, nn.Conv2d) or isinstance(module, nn.ConvTranspose2d) or isinstance(module, nn.Linear):
-
-                # He initialization, from He, K. et al, 2015
-                nn.init.kaiming_normal_(module.weight)
-                if module.bias is not None:
-                    module.bias.data.zero_()
-
-            elif isinstance(module, nn.BatchNorm2d):
-                module.weight.data.fill_(1)
-                module.bias.data.zero_()
-
-
-# TODO: move these classes and the method above to a separate file, eg. components.py
-
-class _EncoderBlock(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(_EncoderBlock, self).__init__()
-        self.cv1 = nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(in_channels)
-        self.lr1 = nn.LeakyReLU(0.1)
-        self.cv2 = nn.Conv2d(in_channels, out_channels, kernel_size=3)
-        self.bn2 = nn.BatchNorm2d(out_channels)
-        self.lr2 = nn.LeakyReLU(0.1)
-        self.maxp = nn.MaxPool2d(kernel_size=3, stride=1)
-
-    def forward(self, x):
-        residual = x
-        # print("residual",residual.shape)
-        out = self.cv1(x)
-        # print("cv1",out.shape)
-        out = self.bn1(out)
-        # print("bn1",out.shape)
-        out = self.lr1(out)
-        # print("lr1",out.shape)
-        out += residual
-        out = self.cv2(out)
-        out = self.bn2(out)
-        out = self.lr2(out)
-        out = self.maxp(out)
-        return out
-
-
-class _DecoderBlock(nn.Module):
-    def __init__(self, in_channels, middle_channels, out_channels):
-        super(_DecoderBlock, self).__init__()
-        self.cv1 = nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(in_channels)
-        self.lr1 = nn.LeakyReLU(0.1)
-        self.cv2 = nn.Conv2d(in_channels, middle_channels, kernel_size=3)
-        self.bn2 = nn.BatchNorm2d(middle_channels)
-        self.lr2 = nn.LeakyReLU(0.1)
-        self.tcv = nn.ConvTranspose2d(middle_channels, out_channels, kernel_size=3)
-
-    def forward(self, x):
-        residual = x
-        # print("residual",residual.shape)
-        out = self.cv1(x)
-        # print("cv1",out.shape)
-        out = self.bn1(out)
-        # print("bn1",out.shape)
-        out = self.lr1(out)
-        # print("lr1",out.shape)
-        out += residual
-        out = self.cv2(out)
-        out = self.bn2(out)
-        out = self.lr2(out)
-        out = self.tcv(out)
-        return out
-
-
-class _CenterBlock(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(_CenterBlock, self).__init__()
-        self.cv1 = nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(in_channels)
-        self.lr1 = nn.LeakyReLU(0.1)
-        self.cv2 = nn.Conv2d(in_channels, out_channels, kernel_size=3)
-        self.bn2 = nn.BatchNorm2d(out_channels)
-        self.lr2 = nn.LeakyReLU(0.1)
-        self.tcv = nn.ConvTranspose2d(out_channels, out_channels, kernel_size=3)
-
-    def forward(self, x):
-        residual = x
-        out = self.cv1(x)
-        out = self.bn1(out)
-        out = self.lr1(out)
-        out += residual
-        out = self.cv2(out)
-        out = self.bn2(out)
-        out = self.lr2(out)
-        out = self.tcv(out)
-        return out
+from src.models.components import _EncoderBlock
+from src.models.components import _DecoderBlock
+from src.models.components import _CenterBlock
 
 
 class BezConv(nn.Module):
@@ -133,11 +38,26 @@ class BezConv(nn.Module):
         self.dec1 = _DecoderBlock(98 + 64, 64, 2)
 
         self.final = nn.Sequential(nn.Conv2d(2, 2, kernel_size=3), )
-        initialize_weights(self)
+        self.initialize_weights(self)
         
         self.device = device
         self.coeffs = coeffs
         self.hist = hist
+
+    def initialize_weights(self):
+        for model in self:
+            for module in model.modules():
+
+                if isinstance(module, nn.Conv2d) or isinstance(module, nn.ConvTranspose2d) or isinstance(module,
+                                                                                                         nn.Linear):
+                    # He initialization, from He, K. et al, 2015
+                    nn.init.kaiming_normal_(module.weight)
+                    if module.bias is not None:
+                        module.bias.data.zero_()
+
+                elif isinstance(module, nn.BatchNorm2d):
+                    module.weight.data.fill_(1)
+                    module.bias.data.zero_()
 
     def wind(self, x):
         """Function to estimate the wind vector field from historical input images.
