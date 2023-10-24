@@ -69,3 +69,4 @@ def create_example_loader(batchsize=1, dtype=torch.FloatTensor):
     loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X, y), batch_size=batchsize)
 
     return loader
+
