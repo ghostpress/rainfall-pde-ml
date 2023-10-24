@@ -1,4 +1,4 @@
-import torch.nn as nn
+import torch.nn as nn                
 
 class _EncoderBlock(nn.Module):
     def __init__(self, in_channels, out_channels):

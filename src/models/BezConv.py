@@ -8,6 +8,19 @@ from src.models.components import _EncoderBlock
 from src.models.components import _DecoderBlock
 from src.models.components import _CenterBlock
 
+def initialize_weights(*models):
+    for model in models:
+        for module in model.modules():
+            if isinstance(module, nn.Conv2d) or isinstance(module, nn.ConvTranspose2d) or isinstance(module, nn.Linear):
+                # He initialization, from He, K. et al, 2015
+                nn.init.kaiming_normal_(module.weight)
+                if module.bias is not None:
+                    module.bias.data.zero_()
+
+            elif isinstance(module, nn.BatchNorm2d):
+                module.weight.data.fill_(1)
+                module.bias.data.zero_()
+                
 
 class BezConv(nn.Module):
     """Class to implement a physics-driven Convolution-Deconvolution Neural Network (CDNN) as described in
@@ -38,26 +51,11 @@ class BezConv(nn.Module):
         self.dec1 = _DecoderBlock(98 + 64, 64, 2)
 
         self.final = nn.Sequential(nn.Conv2d(2, 2, kernel_size=3), )
-        self.initialize_weights(self)
+        initialize_weights(self)
         
         self.device = device
         self.coeffs = coeffs
         self.hist = hist
-
-    def initialize_weights(self):
-        for model in self:
-            for module in model.modules():
-
-                if isinstance(module, nn.Conv2d) or isinstance(module, nn.ConvTranspose2d) or isinstance(module,
-                                                                                                         nn.Linear):
-                    # He initialization, from He, K. et al, 2015
-                    nn.init.kaiming_normal_(module.weight)
-                    if module.bias is not None:
-                        module.bias.data.zero_()
-
-                elif isinstance(module, nn.BatchNorm2d):
-                    module.weight.data.fill_(1)
-                    module.bias.data.zero_()
 
     def wind(self, x):
         """Function to estimate the wind vector field from historical input images.
