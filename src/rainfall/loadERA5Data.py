@@ -15,13 +15,15 @@ Data.create_series("wind")
 #Data.create_series("u10")
 #Data.create_series("v10")
 #Data.create_series("tp")
-#Data.create_series("t2m")
+Data.create_series("t2m")
 
 Data.pad_variables()
 
 #Data.save_to_file(path, "t2m")
 #Data.save_to_file(path, "tp")
-Data.save_to_file(path, "wind")
+#Data.save_to_file(path, "wind")
+Data.save_to_file(daily_outdir + "wind_padded/", "wind", one_series=False)
+Data.save_to_file(daily_outdir + "temperature_padded/", "t2m", one_series=False)
 
 #ERA5DL = ERA5Loader(daily_outdir + "precipitation/", "ERA5_npy", [0.1, 0.1, 0.1], 32, hist=4)
 #precip_training = ERA5DL.create_training()
