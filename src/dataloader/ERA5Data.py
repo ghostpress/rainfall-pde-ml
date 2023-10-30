@@ -22,6 +22,8 @@ class ERA5Data:
 
         self.time = self.get_time()
         self.variable_series = dict()
+
+        self.padded = False
         pass
 
     def get_files(self):
@@ -41,29 +43,70 @@ class ERA5Data:
         print(nc_obj.variables)
         pass
 
-    def create_series(self, variable):
+    def create_wind_series(self):
+        # TODO: check series_u, v, for masked values
+        series_u = nc.Dataset(self.files[0]).variables["u10"][:]
+        series_v = nc.Dataset(self.files[0]).variables["v10"][:]
 
-        series = nc.Dataset(self.files[0]).variables[variable][:]
-        if not self.use_mask:
-            series = ERA5Data.unmask(series)
+        series = np.ma.masked_array([series_u, series_v])
+
+        if not self.use_mask and type(series) == np.ma.masked_array:
+            series = self.unmask(series)
+
+        series.resize((series_u.shape[0], 2, series_u.shape[1], series_u.shape[2]))
 
         for i in range(len(self.files)):
             if i == 0:
                 continue
 
             nc_obj = nc.Dataset(self.files[i])
-            var = nc_obj.variables[variable][:]
 
-            if not self.use_mask:
-                var = ERA5Data.unmask(var)
+            var_u = nc_obj.variables["u10"][:]
+            var_v = nc_obj.variables["v10"][:]
 
-            # Keep just the ERA5 version, which is index 0 in the 2nd dimension
-            if len(var.shape) > 3:
-                var = var[:,0,:,:]
+            if len(var_u.shape) > 3:
+                var_u = var_u[:,0,:,:]
 
+            if len(var_v.shape) > 3:
+                var_v = var_v[:,0,:,:]
+
+            var = np.ma.masked_array([var_u, var_v])
+
+            if not self.use_mask and type(var) == np.ma.masked_array:
+                var = self.unmask(var)
+
+            var.resize((var_u.shape[0], 2, var_u.shape[1], var_u.shape[2]))
             series = np.vstack((series, var))
 
-        self.variable_series[variable] = series
+        self.variable_series["wind"] = series
+
+    def create_series(self, variable):
+
+        if variable == "wind":
+            self.create_wind_series()
+        else:
+            series = nc.Dataset(self.files[0]).variables[variable][:]
+
+            if not self.use_mask and type(series) == np.ma.masked_array:
+                series = self.unmask(series)
+
+            for i in range(len(self.files)):
+                if i == 0:
+                    continue
+
+                nc_obj = nc.Dataset(self.files[i])
+                var = nc_obj.variables[variable][:]
+
+                if not self.use_mask and type(var) == np.ma.masked_array:
+                    var = self.unmask(var)
+
+                # Keep just the ERA5 version, which is index 0 in the 2nd dimension
+                if len(var.shape) > 3:
+                    var = var[:,0,:,:]
+
+                series = np.vstack((series, var))
+
+            self.variable_series[variable] = series
 
     def count_masked_variable(self, variable):
         for f in self.files:
@@ -93,15 +136,18 @@ class ERA5Data:
 
     @staticmethod
     def unmask(arr, use_mean=True, new_val=None):
-        mask = arr.mask
-
-        if use_mean:
-            mean = np.mean(arr)
-            arr[mask] = mean
+        if arr.mask.sum() == 0:
+            return arr.data
         else:
-            arr[mask] = new_val
+            mask = arr.mask
 
-        return arr.data
+            if use_mean:
+                mean = np.mean(arr)
+                arr[mask] = mean
+            else:
+                arr[mask] = new_val
+
+            return arr.data
 
     def scale_variable(self, variable, factor):
         if variable in self.variable_series.keys():
@@ -132,6 +178,9 @@ class ERA5Data:
                 date_min = self.time[0].strftime("%Y-%m-%d")
                 date_max = self.time[-1].strftime("%Y-%m-%d")
                 fname = variable + "_" + "6h" + "_" + date_min + "_" + date_max
+
+                if self.padded:
+                    fname += "_padded"
 
                 if self.use_mask:
                     fname += "_masked.npy"
@@ -168,4 +217,25 @@ class ERA5Data:
                 self.create_series(variable)
                 self.save_to_file(outdir, variable, one_series)
 
+        pass
+
+    def pad_variables(self):
+        print("Padding variables.")
+
+        for name, var in self.variable_series.items():
+
+            # TODO: generalize this for initial shapes other than [:, 30, 23]
+            if len(var.shape) == 3:  # non-wind variables
+                new_shape = (var.shape[0], 64, 64)
+                pad = np.zeros(new_shape)
+                pad[:, 16:46, 20:43] = var
+            else:
+                new_shape = (var.shape[0], 2, 64, 64)
+                pad = np.zeros(new_shape)
+                pad[:, :, 16:46, 20:43] = var
+
+            self.variable_series[name] = pad
+            print(name, ", new shape: ", pad.shape)
+
+        self.padded = True
         pass
