@@ -30,9 +30,8 @@ class WeatherDataset(Dataset):
         var = self.variable_ids[0]
         return len(self.variable_files[var])
 
-    # TODO: update to return loaded pairs and wind - making LoaderUtil obsolete
     def __getitem__(self, idx, variable_id=0, get_wind=True):
-        """Method to return the ith item in the Dataset, for each variable it contains.
+        """Method to return the (idx)th item in the Dataset, for each variable it contains.
         Parameters
         ----------
         idx : int : the desired index
@@ -56,32 +55,6 @@ class WeatherDataset(Dataset):
             return final_data[idx], final_ends[idx], final_wind[idx]
         else:
             return final_data[idx], final_ends[idx]
-
-        # Case 1: dataset contains just the primary variable
-        #if len(self.variable_ids) == 1:
-        #    var = self.variable_ids[0]
-        #    return self._load_data_from_file(self.variable_files[var][idx])
-
-        # Case 2: dataset contains the primary variable and one other variable
-        #elif len(self.variable_ids) == 2:
-        #    var_0 = self.variable_ids[0]
-        #    var_1 = self.variable_ids[1]
-
-        #    item1 = self._load_data_from_file(self.variable_files[var_0][idx])
-        #    item2 = self._load_data_from_file(self.variable_files[var_1][idx])
-
-        #    return item1, item2
-
-        # Case 3: dataset contains the primary variable and many other variables
-        #else:
-        #    var_0 = self.variable_ids[0]
-        #    items = [self._load_data_from_file(self.variable_files[var_0][idx])]
-
-        #    for i in range(len(self.variable_files)):
-        #        var_i = self.variable_ids[i+1]
-        #        items.append(self._load_data_from_file(self.variable_files[var_i][idx]))
-
-        #    return items
 
     def _get_date_from_filename(self, fname):
         """Helper method to take a filename containing a date string and return the date as a datetime.datetime object.
