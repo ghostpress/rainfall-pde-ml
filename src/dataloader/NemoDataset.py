@@ -4,8 +4,8 @@ from src.dataloader.WeatherDataset import WeatherDataset
 
 class NemoDataset(WeatherDataset):
 
-    def __init__(self, naming_conv, variable_ids, variable_files):
-        super().__init__(naming_conv, variable_ids, variable_files)
+    def __init__(self, naming_conv, variable_ids, variable_files, history):
+        super().__init__(naming_conv, variable_ids, variable_files, history)
 
     def _search_by_region(self, files, region):
         """Helper method to search a list of files for only those corresponding to a desired region.

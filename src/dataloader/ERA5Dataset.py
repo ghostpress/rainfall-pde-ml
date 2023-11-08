@@ -5,6 +5,9 @@ from src.dataloader.WeatherDataset import WeatherDataset
 
 class ERA5Dataset(WeatherDataset):
 
+    def __init__(self, naming_conv, variable_ids, variable_files, history):
+        super().__init__(naming_conv, variable_ids, variable_files, history)
+
     def train_val_test_split(self, split):
         """Method to split the data in a directory into training, validation, and test sets and return a new Dataset
         object. Uses the helper method train_val_test_cutoffs(). Returns a list of Dataset objects, one for each split.
@@ -42,15 +45,15 @@ class ERA5Dataset(WeatherDataset):
             test_files[vname] = test
 
         TrainingDataset = ERA5Dataset(naming_conv=self.file_naming_convention, variable_files=train_files,
-                                      variable_ids=self.variable_ids)
+                                      variable_ids=self.variable_ids, history=self.history)
         ValidationDataset = ERA5Dataset(naming_conv=self.file_naming_convention, variable_files=val_files,
-                                        variable_ids=self.variable_ids)
+                                        variable_ids=self.variable_ids, history=self.history)
         TestingDataset = ERA5Dataset(naming_conv=self.file_naming_convention, variable_files=test_files,
-                                     variable_ids=self.variable_ids)
+                                     variable_ids=self.variable_ids, history=self.history)
 
         return TrainingDataset, ValidationDataset, TestingDataset
 
-    def get_pairs(self, variable, history=1, use_wind=False):
+    def get_pairs(self, variable, use_wind=False):
         """Method to separate data into inputs (X) and ends (y) for a given variable.
         For example: to use 4 previous days (X, hist=4) to predict the next day (y). The "pairs" are pairs of (X,y)
         inputs and ends.
@@ -58,7 +61,6 @@ class ERA5Dataset(WeatherDataset):
         Parameters
         ----------
         variable : str : the variable to create pairs for
-        history : int : the amount of history to use for prediction
         use_wind : bool : whether to also return the wind arrays in the pairs
 
         Returns
@@ -74,10 +76,10 @@ class ERA5Dataset(WeatherDataset):
             n = len(files)
 
             inps = []
-            ends = files[history:]
+            ends = files[self.history:]
 
-            for i in range(n - history):
-                inps.append(files[i:i + history])
+            for i in range(n - self.history):
+                inps.append(files[i:i + self.history])
 
             return np.array(inps), np.array(ends)
         else:
@@ -87,11 +89,11 @@ class ERA5Dataset(WeatherDataset):
             n = len(var_files)
 
             inps = []
-            ends = var_files[history:]
+            ends = var_files[self.history:]
             wind = []
 
-            for i in range(n - history):
-                inps.append(var_files[i:i + history])
+            for i in range(n - self.history):
+                inps.append(var_files[i:i + self.history])
                 wind.append(wind_files[i])
 
             return np.array(inps), np.array(ends), np.array(wind)

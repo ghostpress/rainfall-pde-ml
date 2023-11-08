@@ -2,12 +2,13 @@ import os
 import numpy as np
 import datetime
 import math
+import torch
 from torch.utils.data import Dataset
 
 
 class WeatherDataset(Dataset):
 
-    def __init__(self, naming_conv, variable_ids, variable_files):
+    def __init__(self, naming_conv, variable_ids, variable_files, history):
         """Method to instantiate a WeatherDataset object. Takes a string describing the file naming convention for the
         data, a dictionary of variable ids and names, and a dictionary of variable names and files.
 
@@ -16,49 +17,71 @@ class WeatherDataset(Dataset):
         naming_conv : str : the naming convention used
         variable_ids : dict : the dictionary of variable id's : variable names
         variable_files : dict : the dictionary of variable names : variable files
+        history : int : the amount of history to use for constructing the data
         """
         assert naming_conv in ["ERA5_npy", "NEMO_npy"], f"Unsupported naming convention: {naming_conv}"
         self.file_naming_convention = naming_conv
         self.variable_ids = variable_ids
         self.variable_files = variable_files
+        self.history = history
 
     def __len__(self):
         """Method to return the length of the Dataset."""
         var = self.variable_ids[0]
         return len(self.variable_files[var])
 
-    def __getitem__(self, idx):
+    # TODO: update to return loaded pairs and wind - making LoaderUtil obsolete
+    def __getitem__(self, idx, variable_id=0, get_wind=True):
         """Method to return the ith item in the Dataset, for each variable it contains.
         Parameters
         ----------
         idx : int : the desired index
+        variable_id : int : the id of the desired variable to get, if different from the primary (0)
+        get_wind : bool : whether to also get the wind item at the desired index
         """
+        data = []
+        pairs = self.get_pairs(self.variable_ids[variable_id], use_wind=get_wind)
+
+        for i in range(len(pairs[0])):
+            dat = self.load_data_from_files(pairs[0][i])
+            data.append(dat)
+
+        ends = self.load_data_from_files(pairs[1])
+        final_data = torch.from_numpy(np.array(data)).type(torch.FloatTensor)
+        final_ends = torch.from_numpy(np.array(ends)).type(torch.FloatTensor)
+
+        if get_wind:
+            wind = self.load_data_from_files(pairs[2])
+            final_wind = torch.from_numpy(np.array(wind)).type(torch.FloatTensor)
+            return final_data[idx], final_ends[idx], final_wind[idx]
+        else:
+            return final_data[idx], final_ends[idx]
 
         # Case 1: dataset contains just the primary variable
-        if len(self.variable_ids) == 1:
-            var = self.variable_ids[0]
-            return self._load_data_from_file(self.variable_files[var][idx])
+        #if len(self.variable_ids) == 1:
+        #    var = self.variable_ids[0]
+        #    return self._load_data_from_file(self.variable_files[var][idx])
 
         # Case 2: dataset contains the primary variable and one other variable
-        elif len(self.variable_ids) == 2:
-            var_0 = self.variable_ids[0]
-            var_1 = self.variable_ids[1]
+        #elif len(self.variable_ids) == 2:
+        #    var_0 = self.variable_ids[0]
+        #    var_1 = self.variable_ids[1]
 
-            item1 = self._load_data_from_file(self.variable_files[var_0][idx])
-            item2 = self._load_data_from_file(self.variable_files[var_1][idx])
+        #    item1 = self._load_data_from_file(self.variable_files[var_0][idx])
+        #    item2 = self._load_data_from_file(self.variable_files[var_1][idx])
 
-            return item1, item2
+        #    return item1, item2
 
         # Case 3: dataset contains the primary variable and many other variables
-        else:
-            var_0 = self.variable_ids[0]
-            items = [self._load_data_from_file(self.variable_files[var_0][idx])]
+        #else:
+        #    var_0 = self.variable_ids[0]
+        #    items = [self._load_data_from_file(self.variable_files[var_0][idx])]
 
-            for i in range(len(self.variable_files)):
-                var_i = self.variable_ids[i+1]
-                items.append(self._load_data_from_file(self.variable_files[var_i][idx]))
+        #    for i in range(len(self.variable_files)):
+        #        var_i = self.variable_ids[i+1]
+        #        items.append(self._load_data_from_file(self.variable_files[var_i][idx]))
 
-            return items
+        #    return items
 
     def _get_date_from_filename(self, fname):
         """Helper method to take a filename containing a date string and return the date as a datetime.datetime object.
@@ -132,7 +155,7 @@ class WeatherDataset(Dataset):
 
         # Because of rounding, some files may have been missed
         # Add these to the test split
-        if cutoffs[2] < end_date:
+        if cutoffs[2] <= end_date:
             cutoffs[2] = end_date
 
         return cutoffs
@@ -156,7 +179,7 @@ class WeatherDataset(Dataset):
 
         return np.array(data)
 
-    def get_pairs(self, variable, history=1):
+    def get_pairs(self, variable, use_wind=False):
         """Method to separate data into inputs (X) and ends (y) for a given variable.
         For example: to use 4 previous days (X, hist=4) to predict the next day (y). The "pairs" are pairs of (X,y)
         inputs and ends. Implemented by each subclass because the dimensions of the data differ.
@@ -164,7 +187,7 @@ class WeatherDataset(Dataset):
         Parameters
         ----------
         variable : str : the variable to create pairs for
-        history : int : the amount of history to use for prediction
+        use_wind : bool : whether to return wind alongside the pairs
 
         Returns
         -------
