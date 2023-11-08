@@ -12,6 +12,7 @@ class ERA5Data:
         ----------
         topdir : str : path to parent directory holding .nc files
         first_date : datetime.datetime : the first date of the data, from the time units
+        use_mask : bool : whether to use the masked data or to fill with a value
         """
         self.topdir = topdir
         self.first_date = first_date
@@ -44,7 +45,6 @@ class ERA5Data:
         pass
 
     def create_wind_series(self):
-        # TODO: check series_u, v, for masked values
         series_u = nc.Dataset(self.files[0]).variables["u10"][:]
         series_v = nc.Dataset(self.files[0]).variables["v10"][:]
 

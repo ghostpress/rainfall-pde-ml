@@ -64,7 +64,6 @@ class WeatherDataLoader:
         delta = int((last - first) / datetime.timedelta(days=1))
 
         return delta
-        pass
 
     def train_val_test_cutoffs(self):
         """Helper method to create lists of filenames for the train, val, and test data splits. Uses the dates in the

@@ -35,6 +35,3 @@ class ERA5Loader(WeatherDataLoader.WeatherDataLoader):
         print("Example image:")
         plt.imshow(arr[0][0][0])
         plt.show()
-
-    def add_wind_field(self):
-        raise NotImplementedError
