@@ -6,6 +6,12 @@ from src.dataloader.WeatherDataset import WeatherDataset
 class ERA5Dataset(WeatherDataset):
 
     def train_val_test_split(self, split):
+        """Method to split the data in a directory into training, validation, and test sets and return a new Dataset
+        object. Uses the helper method train_val_test_cutoffs(). Returns a list of Dataset objects, one for each split.
+        Parameters
+        ----------
+        split : list : list of fractions for each split
+        """
         assert len(split) == 3, "Please include a % split for train, validation, and test sets."
 
         train_files = dict()
@@ -44,7 +50,23 @@ class ERA5Dataset(WeatherDataset):
 
         return TrainingDataset, ValidationDataset, TestingDataset
 
-    def get_pairs(self, variable, use_wind=False, history=1):
+    def get_pairs(self, variable, history=1, use_wind=False):
+        """Method to separate data into inputs (X) and ends (y) for a given variable.
+        For example: to use 4 previous days (X, hist=4) to predict the next day (y). The "pairs" are pairs of (X,y)
+        inputs and ends.
+
+        Parameters
+        ----------
+        variable : str : the variable to create pairs for
+        history : int : the amount of history to use for prediction
+        use_wind : bool : whether to also return the wind arrays in the pairs
+
+        Returns
+        -------
+        inps : np.array : filenames for inputs
+        ends : np.array : filenames for ends
+        wind : np.array : filenames for wind, if used
+        """
 
         if not use_wind:
             files = self.variable_files[variable]
