@@ -2,7 +2,7 @@ import numpy as np
 from src.dataloader.WeatherDataset import WeatherDataset
 
 
-class ERA5Dataset(WeatherDataset):
+class NemoDataset(WeatherDataset):
 
     def __init__(self, parent_path, naming_conv, variable_to_predict):
         super().__init__(parent_path, naming_conv, variable_to_predict, other_variables=[])
