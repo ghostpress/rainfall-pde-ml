@@ -1,9 +1,5 @@
 import datetime
-import matplotlib.pyplot as plt
-import netCDF4
-import numpy as np
-from src.dataloader.ERA5Loader import ERA5Loader
-from src.dataloader.ERA5Data import ERA5Data
+from delete.ERA5Data import ERA5Data
 
 path = "/home/lucia/projects/FORMES/rainfall-pde-ml/data/era5_npy/"  # path to ERA5 series numpy files - should contain one .npy file per variable of interest for all data
 daily_outdir = "/home/lucia/projects/FORMES/rainfall-pde-ml/data/era5_daily_npy/"  # path to ERA5 daily numpy files for the variable of interest - should contain one .npy file per day
