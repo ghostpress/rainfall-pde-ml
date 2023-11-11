@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from src.models.BezConv import BezConv as BC
-from src.dataloader import DataLoader
+from delete import DataLoader
 from src.temperature.Experiment import Experiment
 import utils
 
