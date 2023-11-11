@@ -1,12 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from src.dataloader.WeatherDataset import WeatherDataset
+from src.datasets.WeatherDataset import WeatherDataset
 
 
 class ERA5Dataset(WeatherDataset):
 
-    def __init__(self, naming_conv, variable_ids, variable_files, history):
-        super().__init__(naming_conv, variable_ids, variable_files, history)
+    def __init__(self, naming_conv, variable_ids, variable_files, history, hour=None):
+        super().__init__(naming_conv, variable_ids, variable_files, history, hour)
 
     def train_val_test_split(self, split):
         """Method to split the data in a directory into training, validation, and test sets and return a new Dataset
@@ -45,11 +45,11 @@ class ERA5Dataset(WeatherDataset):
             test_files[vname] = test
 
         TrainingDataset = ERA5Dataset(naming_conv=self.file_naming_convention, variable_files=train_files,
-                                      variable_ids=self.variable_ids, history=self.history)
+                                      variable_ids=self.variable_ids, history=self.history, hour=self.hour)
         ValidationDataset = ERA5Dataset(naming_conv=self.file_naming_convention, variable_files=val_files,
-                                        variable_ids=self.variable_ids, history=self.history)
+                                        variable_ids=self.variable_ids, history=self.history, hour=self.hour)
         TestingDataset = ERA5Dataset(naming_conv=self.file_naming_convention, variable_files=test_files,
-                                     variable_ids=self.variable_ids, history=self.history)
+                                     variable_ids=self.variable_ids, history=self.history, hour=self.hour)
 
         return TrainingDataset, ValidationDataset, TestingDataset
 
@@ -99,7 +99,7 @@ class ERA5Dataset(WeatherDataset):
             return np.array(inps), np.array(ends), np.array(wind)
 
     def plot_example_image(self, arr):
-        """Helper method to take a multidimensional array or Tensor from a dataloader and plot the image embedded
+        """Helper method to take a multidimensional array or Tensor from a datasets and plot the image embedded
         within. Implemented by each subclass because the dimensions of the data differ.
 
         Parameters

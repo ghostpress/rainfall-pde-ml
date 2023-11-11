@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 
 class WeatherDataset(Dataset):
 
-    def __init__(self, naming_conv, variable_ids, variable_files, history):
+    def __init__(self, naming_conv, variable_ids, variable_files, history, hour=None):
         """Method to instantiate a WeatherDataset object. Takes a string describing the file naming convention for the
         data, a dictionary of variable ids and names, and a dictionary of variable names and files.
 
@@ -18,12 +18,14 @@ class WeatherDataset(Dataset):
         variable_ids : dict : the dictionary of variable id's : variable names
         variable_files : dict : the dictionary of variable names : variable files
         history : int : the amount of history to use for constructing the data
+        hour : int : if not using every hourly observation in a day, index for the desired ones
         """
         assert naming_conv in ["ERA5_npy", "NEMO_npy"], f"Unsupported naming convention: {naming_conv}"
         self.file_naming_convention = naming_conv
         self.variable_ids = variable_ids
         self.variable_files = variable_files
         self.history = history
+        self.hour = hour
 
     def __len__(self):
         """Method to return the length of the Dataset."""
@@ -36,21 +38,21 @@ class WeatherDataset(Dataset):
         ----------
         idx : int : the desired index
         variable_id : int : the id of the desired variable to get, if different from the primary (0)
-        get_wind : bool : whether to also get the wind item at the desired index
+        get_wind : bool : whether to also get the wind item at the desired idx
         """
         data = []
         pairs = self.get_pairs(self.variable_ids[variable_id], use_wind=get_wind)
 
         for i in range(len(pairs[0])):
-            dat = self.load_data_from_files(pairs[0][i])
+            dat = self.load_data_from_files(pairs[0][i], index=self.hour)
             data.append(dat)
 
-        ends = self.load_data_from_files(pairs[1])
+        ends = self.load_data_from_files(pairs[1], index=self.hour)
         final_data = torch.from_numpy(np.array(data)).type(torch.FloatTensor)
         final_ends = torch.from_numpy(np.array(ends)).type(torch.FloatTensor)
 
         if get_wind:
-            wind = self.load_data_from_files(pairs[2])
+            wind = self.load_data_from_files(pairs[2], index=self.hour)
             final_wind = torch.from_numpy(np.array(wind)).type(torch.FloatTensor)
             return final_data[idx], final_ends[idx], final_wind[idx]
         else:
@@ -140,15 +142,18 @@ class WeatherDataset(Dataset):
         raise NotImplementedError("Please implement this method for each subclass.")
 
     # helper method
-    def _load_data_from_file(self, filename):
+    def _load_data_from_file(self, filename, index=None):
         """Helper method to load a single .npy file."""
-        return np.load(filename)
+        if index is None:
+            return np.load(filename)
+        else:
+            return np.load(filename)[index]
 
-    def load_data_from_files(self, files):
+    def load_data_from_files(self, files, index=None):
         """Method to load data from a list of .npy files."""
         data = []
         for f in files:
-            data.append(self._load_data_from_file(f))
+            data.append(self._load_data_from_file(f, index=index))
 
         return np.array(data)
 
@@ -170,7 +175,7 @@ class WeatherDataset(Dataset):
         raise NotImplementedError("Please implement this method for each subclass.")
 
     def plot_example_image(self, arr):
-        """Helper method to take a multidimensional array or Tensor from a dataloader and plot the image embedded
+        """Helper method to take a multidimensional array or Tensor from a datasets and plot the image embedded
         within. Implemented by each subclass because the dimensions of the data differ.
 
         Parameters
