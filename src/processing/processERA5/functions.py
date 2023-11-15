@@ -146,28 +146,53 @@ def add_to_variable(variable_series, variable, summand):
     return variable_series
 
 
-def pad_variables(variable_series):
-    print("Padding variables.")
-    padded = variable_series.copy()
+def resize_variables(variable_series):
+    print("Resizing variables.")
+    resized = variable_series.copy()
 
-    for name, var in padded.items():
+    for name, var in resized.items():
 
-        # TODO: generalize this for initial shapes other than [:, 30, 23]
         if len(var.shape) == 3:  # non-wind variables
-            new_shape = (var.shape[0], 64, 64)
-            pad = np.zeros(new_shape)
-            pad[:, 16:46, 20:43] = var
+            #resized_img = np.empty((var.shape[0], 64, 64))
+            #for t in range(var.shape[0]):
+            #    temp1 = np.repeat(var[t], 2, axis=0)
+                #print("Intermediate shape:", temp1.shape)
+            #    temp2 = np.repeat(temp1, 3, axis=1)
+                #print("Intermediate shape:", temp2.shape)
+            #    temp3 = np.pad(temp2, pad_width=((2,2), (0,0)), mode="edge")
+                #print("Intermediate shape:", temp3.shape)
+            #    resized_img[t] = temp3[:, 0:64]
+                #print("Final shape:", resized_img[t].shape)
+            temp1 = np.repeat(var, 2, axis=1)
+            temp2 = np.repeat(temp1, 3, axis=2)
+            temp3 = np.pad(temp2, pad_width=((0, 0), (2, 2), (0, 0)), mode="edge")
+            resized_img = temp3[:, :, 0:64]
+
         else:
-            new_shape = (var.shape[0], 2, 64, 64)
-            pad = np.zeros(new_shape)
-            pad[:, :, 16:46, 20:43] = var
+            #resized_img = np.empty((var.shape[0], 2, 64, 64))
+            #for t in range(var.shape[0]):
+            #    uv = np.empty((2, 64, 64))
+            #    for w in range(2):
+            #        temp1 = np.repeat(var[t, w], 2, axis=0)
+                    #print("Intermediate shape:", temp1.shape)
+            #        temp2 = np.repeat(temp1, 3, axis=1)
+                    #print("Intermediate shape:", temp2.shape)
+            #        temp3 = np.pad(temp2, pad_width=((2, 2), (0, 0)), mode="edge")
+                    #print("Intermediate shape:", temp3.shape)
+            #        uv[w] = temp3[:, 0:64]
+            #    resized_img[t] = uv
+                #print("Final shape:", resized_img[t].shape)
+            temp1 = np.repeat(var, 2, axis=2)
+            temp2 = np.repeat(temp1, 3, axis=3)
+            temp3 = np.pad(temp2, pad_width=((0, 0), (0, 0), (2, 2), (0, 0)), mode="edge")
+            resized_img = temp3[:, :, :, 0:64]
 
-        padded[name] = pad
-        print(name, ", new shape: ", pad.shape)
-    return padded
+        resized[name] = resized_img
+        print(name, "new shape:", resized_img.shape)
+    return resized
 
 
-def save_to_file(outdir, time, variable_series, variable, one_series=True, padded=False, use_mask=False):
+def save_to_file(outdir, time, variable_series, variable, one_series=True, resized=False, use_mask=False):
     print("Saving data to files in", outdir)
 
     if one_series:
@@ -177,8 +202,8 @@ def save_to_file(outdir, time, variable_series, variable, one_series=True, padde
             date_max = time[-1].strftime("%Y-%m-%d")
             fname = variable + "_" + "6h" + "_" + date_min + "_" + date_max
 
-            if padded:
-                fname += "_padded"
+            if resized:
+                fname += "_resized"
 
             if use_mask:
                 fname += "_masked.npy"
@@ -189,7 +214,7 @@ def save_to_file(outdir, time, variable_series, variable, one_series=True, padde
 
         else:
             create_series(variable, variable_series, use_mask)
-            save_to_file(outdir, time, variable_series, variable, one_series, padded, use_mask)
+            save_to_file(outdir, time, variable_series, variable, one_series, resized, use_mask)
     else:
         print("Saving individual daily files.")
         if variable in variable_series.keys():
@@ -213,6 +238,6 @@ def save_to_file(outdir, time, variable_series, variable, one_series=True, padde
 
         else:
             create_series(variable, variable_series, use_mask)
-            save_to_file(outdir, time, variable_series, variable, one_series, padded, use_mask)
+            save_to_file(outdir, time, variable_series, variable, one_series, resized, use_mask)
 
     print("Done.")
