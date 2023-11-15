@@ -1,4 +1,3 @@
-import os
 import numpy as np
 import datetime
 import math
@@ -110,7 +109,6 @@ class WeatherDataset(Dataset):
         -------
         cutoffs : list : date cutoffs for each split
         """
-
         all_files = self.variable_files[variable]
         all_files.sort()
         nfiles = len(all_files)
