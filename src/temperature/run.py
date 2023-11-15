@@ -4,19 +4,21 @@ import torch
 import torch.nn as nn
 
 from src.models.BezConv import BezConv as BC
-from src.dataloader import DataLoader
+from delete import DataLoader
 from src.temperature.Experiment import Experiment
 import utils
 
 device = utils.check_device()
+outdir = "/projectnb/labci/Lucia/rainfall-pde-ml/experiments/"
+os.chdir("/projectnb/labci/Lucia/rainfall-pde-ml/")
 
 # ------------------------------ Set up directory for experiments -----------------------
 try:
-    os.mkdir("/projectnb/labci/Lucia/rainfall-pde-ml/experiments/" + str(datetime.date.today()))
+    os.mkdir(outdir + str(datetime.date.today()))
 except FileExistsError as e:
     print("Already ran experiments today.")
 finally:
-    path = "/projectnb/labci/Lucia/rainfall-pde-ml/experiments/" + str(datetime.date.today())
+    path = outdir + str(datetime.date.today())
 
 # ------------------------------ Data Loaders -----------------------
 DL = DataLoader.DataLoader(path, [0.8, 0.1, 0.1], 32, 4)

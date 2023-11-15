@@ -1,31 +1,13 @@
-import datetime
-import matplotlib.pyplot as plt
 import numpy as np
-from src.dataloader import WeatherDataLoader
+from src.datasets.WeatherDataset import WeatherDataset
 
 
-class SSTLoader(WeatherDataLoader.WeatherDataLoader):
+class NemoDataset(WeatherDataset):
 
-    def get_date_from_filename(self, fname):
-        """Helper method to take a filename containing a date string and return the date as a datetime.datetime object.
-        Implemented by each subclass because the file naming convention used for each dataset is different.
+    def __init__(self, naming_conv, variable_ids, variable_files, history):
+        super().__init__(naming_conv, variable_ids, variable_files, history)
 
-        Naming convention for SST data: sst_geo_yyyymmdd.nc_region_XX.npy
-
-        Parameters
-        ----------
-        fname : str : filename
-
-        Returns
-        -------
-        date : datetime.datetime : date represented by the string in the filename
-        """
-        assert(self.file_naming_convention == "NEMO_npy")
-
-        date = datetime.datetime.strptime(fname[8:16], "%Y%m%d").date()
-        return date
-
-    def search_by_region(self, files, region):
+    def _search_by_region(self, files, region):
         """Helper method to search a list of files for only those corresponding to a desired region.
         File naming convention: sst_geo_yyyymmdd.nc_region_XX.npy
 
@@ -48,7 +30,7 @@ class SSTLoader(WeatherDataLoader.WeatherDataLoader):
         region_files.sort()
         return region_files
 
-    def all_regions(self, files):
+    def _all_regions(self, files):
         """Helper method to take a list of filenames and return a list of the unique region numbers.
         File naming convention: sst_geo_yyyymmdd.nc_region_XX.npy
 
@@ -77,13 +59,14 @@ class SSTLoader(WeatherDataLoader.WeatherDataLoader):
         regions.sort()
         return regions
 
-    def __get_pairs(self, files):
+    def get_pairs(self, files, history=1):
         """Method to separate data into inputs (X) and ends (y), for example to use 4 previous days (hist=4) to
         predict the next day. The "pairs" are pairs of (X,y) inputs and ends. This method works on one region at a time.
 
         Parameters
         ----------
         files : list : list of files from which to get pairs
+        history : int : number of previous observations to predict future observation
 
         Returns
         -------
@@ -91,33 +74,21 @@ class SSTLoader(WeatherDataLoader.WeatherDataLoader):
         ends : list : filenames for ends
         """
 
-        regions = self.all_regions(files)
+        regions = self._all_regions(files)
         final_inps = []
         final_ends = []
 
         for reg in regions:
-            region_files = self.search_by_region(files, reg)
+            region_files = self._search_by_region(files, reg)
 
             reg_n = len(region_files)
             reg_inps = []
-            reg_ends = region_files[self.history:]
+            reg_ends = region_files[history:]
 
-            for i in range(reg_n - self.history):
-                reg_inps.append(region_files[i:i + self.history])
+            for i in range(reg_n - history):
+                reg_inps.append(region_files[i:i + history])
 
             final_inps.append(reg_inps)
             final_ends.append(reg_ends)
 
         return np.array(final_inps), np.array(final_ends)
-
-    def plot_example_image(self, arr):
-        """Helper method to take a multidimensional array or Tensor from a dataloader and plot the image embedded
-        within. Implemented by each subclass because the dimensions of the data differ.
-
-        Parameters
-        ----------
-        arr : torch.Tensor : array containing image to plot
-        """
-        print("Example image:")
-        plt.imshow(arr[0][0])
-        plt.show()
