@@ -31,17 +31,21 @@ class WeatherDataset(Dataset):
         var = self.variable_ids[0]
         return len(self.variable_files[var])
 
-    def __getitem__(self, idx, variable_id=0, get_wind=True):
+    def __getitem__(self, idx, variable_id=0):
         """Method to return the (idx)th item in the Dataset, for each variable it contains.
         Parameters
         ----------
         idx : int : the desired index
         variable_id : int : the id of the desired variable to get, if different from the primary (0)
-        get_wind : bool : whether to also get the wind item at the desired idx
         """
         data = []
+        get_wind = ("wind" in list(self.variable_ids.values()))
         pairs = self.get_pairs(self.variable_ids[variable_id], use_wind=get_wind)
 
+        # FIXME: works for ERA5 data of shape (k, 4, 64, 64) or (k, 2, 64, 64) but not NEMO data of shape (k, 64, 64)
+        #print(len(pairs[0]))  # 48, one X of the pair for each region
+        #print(len(pairs[1]))  # 48, one y of the pair for each region
+        #print(pairs[0][0].shape)
         for i in range(len(pairs[0])):
             dat = self.load_data_from_files(pairs[0][i], index=self.hour)
             data.append(dat)
@@ -72,7 +76,7 @@ class WeatherDataset(Dataset):
         if self.file_naming_convention == "ERA5_npy":
             return datetime.datetime.strptime(fname.split("_")[-2], "%Y%m%d").date()
         else:
-            return datetime.datetime.strptime(fname[8:16], "%Y%m%d").date()
+            return datetime.datetime.strptime(fname.split("_")[-3][:-3], "%Y%m%d").date()  # fname[8:16]
 
     def _all_days(self, files):
         """Helper method to take a list of files and return the total number of days represented by the files in
@@ -142,6 +146,7 @@ class WeatherDataset(Dataset):
     # helper method
     def _load_data_from_file(self, filename, index=None):
         """Helper method to load a single .npy file."""
+        #print(filename)
         if index is None:
             return np.load(filename)
         else:
@@ -149,6 +154,8 @@ class WeatherDataset(Dataset):
 
     def load_data_from_files(self, files, index=None):
         """Method to load data from a list of .npy files."""
+        #print(files)
+        #print(len(files))
         data = []
         for f in files:
             data.append(self._load_data_from_file(f, index=index))

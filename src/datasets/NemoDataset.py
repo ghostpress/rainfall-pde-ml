@@ -59,7 +59,7 @@ class NemoDataset(WeatherDataset):
         regions.sort()
         return regions
 
-    def get_pairs(self, files, history=1):
+    def get_pairs(self, variable, use_wind=False):#(self, files, history=1, use_wind=False):
         """Method to separate data into inputs (X) and ends (y), for example to use 4 previous days (hist=4) to
         predict the next day. The "pairs" are pairs of (X,y) inputs and ends. This method works on one region at a time.
 
@@ -73,6 +73,8 @@ class NemoDataset(WeatherDataset):
         inps : np.ndarray : filenames for inputs
         ends : list : filenames for ends
         """
+        files = self.variable_files[variable]
+        assert(self.file_naming_convention == "NEMO_npy")
 
         regions = self._all_regions(files)
         final_inps = []
@@ -83,12 +85,62 @@ class NemoDataset(WeatherDataset):
 
             reg_n = len(region_files)
             reg_inps = []
-            reg_ends = region_files[history:]
+            reg_ends = region_files[self.history:]
 
-            for i in range(reg_n - history):
-                reg_inps.append(region_files[i:i + history])
+            for i in range(reg_n - self.history):
+                reg_inps.append(region_files[i:i + self.history])
 
             final_inps.append(reg_inps)
             final_ends.append(reg_ends)
 
-        return np.array(final_inps), np.array(final_ends)
+        final_inps = np.array(final_inps)
+        final_ends = np.array(final_ends)
+
+        # Flatten arrays along region axis, while still keeping regions in correct order for (X,y) pairs
+        #print("inps", final_inps.shape)
+        #print("ends", final_ends.shape)
+        nreg = final_inps.shape[0]
+        ndays = final_inps.shape[1]
+        inps = final_inps.reshape((nreg*ndays, final_inps.shape[2]))
+        ends = final_ends.flatten()
+
+        return inps, ends
+
+    def train_val_test_split(self, split):
+        assert len(split) == 3, "Please include a % split for train, validation, and test sets."
+
+        train_files = dict()
+        val_files = dict()
+        test_files = dict()
+
+        for i in range(len(self.variable_ids)):
+            print(f"Splitting dataset for variable {i}: {self.variable_ids[i]}")
+            vname = self.variable_ids[i]
+            cutoffs = self._train_val_test_cutoffs(split, vname)  # FIXME: error here
+
+            all_files = self.variable_files[vname]
+            all_files.sort()
+
+            train, val, test = [], [], []
+
+            for f in all_files:
+                file_date = self._get_date_from_filename(f)
+                if file_date <= cutoffs[0]:
+                    train.append(f)
+                elif (file_date > cutoffs[0]) & (file_date <= cutoffs[1]):
+                    val.append(f)
+                else:
+                    test.append(f)
+
+            train_files[vname] = train
+            val_files[vname] = val
+            test_files[vname] = test
+
+        TrainingDataset = NemoDataset(naming_conv=self.file_naming_convention, variable_files=train_files,
+                                      variable_ids=self.variable_ids, history=self.history)
+        ValidationDataset = NemoDataset(naming_conv=self.file_naming_convention, variable_files=val_files,
+                                        variable_ids=self.variable_ids, history=self.history)
+        TestingDataset = NemoDataset(naming_conv=self.file_naming_convention, variable_files=test_files,
+                                     variable_ids=self.variable_ids, history=self.history)
+
+        return TrainingDataset, ValidationDataset, TestingDataset
