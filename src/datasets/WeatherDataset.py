@@ -35,30 +35,27 @@ class WeatherDataset(Dataset):
         return len(self.variable_files[var])
 
     def __getitem__(self, idx, variable_id=0):
-        """Method to return the (idx)th item in the Dataset, for each variable it contains.
+        """Method to return Wthe (idx)th item in the Dataset, for each variable it contains.
         Parameters
         ----------
         idx : int : the desired index
         variable_id : int : the id of the desired variable to get, if different from the primary (0)
         """
-        data = []
         get_wind = ("wind" in list(self.variable_ids.values()))
-        pairs = self.pairs #self.get_pairs(self.variable_ids[variable_id], use_wind=get_wind)
+        pairs = self.pairs
 
-        for i in range(len(pairs[0])):
-            dat = self.load_data_from_files(pairs[0][i], index=self.hour)
-            data.append(dat)
+        data = self.load_data_from_files(pairs[0][idx], index=self.hour)
+        ends = self._load_data_from_file(pairs[1][idx], index=self.hour)
 
-        ends = self.load_data_from_files(pairs[1], index=self.hour)
         final_data = torch.from_numpy(np.array(data)).type(torch.FloatTensor)
         final_ends = torch.from_numpy(np.array(ends)).type(torch.FloatTensor)
 
         if get_wind:
-            wind = self.load_data_from_files(pairs[2], index=self.hour)
+            wind = self._load_data_from_file(pairs[2][idx], index=self.hour)
             final_wind = torch.from_numpy(np.array(wind)).type(torch.FloatTensor)
-            return final_data[idx], final_ends[idx], final_wind[idx]
+            return final_data, final_ends, final_wind
         else:
-            return final_data[idx], final_ends[idx]
+            return final_data, final_ends
 
     def _get_date_from_filename(self, fname):
         """Helper method to take a filename containing a date string and return the date as a datetime.datetime object.
@@ -145,7 +142,6 @@ class WeatherDataset(Dataset):
     # helper method
     def _load_data_from_file(self, filename, index=None):
         """Helper method to load a single .npy file."""
-        #print(filename)
         if index is None:
             return np.load(filename)
         else:
@@ -153,15 +149,12 @@ class WeatherDataset(Dataset):
 
     def load_data_from_files(self, files, index=None):
         """Method to load data from a list of .npy files."""
-        #print(files)
-        #print(len(files))
         data = []
         for f in files:
             data.append(self._load_data_from_file(f, index=index))
 
         return np.array(data)
 
-    # FIXME: don't call get_pairs() in get_item() -> create pairs exactly once and index the pairs
     def get_pairs(self, variable, use_wind=False):
         """Method to separate data into inputs (X) and ends (y) for a given variable.
         For example: to use 4 previous days (X, hist=4) to predict the next day (y). The "pairs" are pairs of (X,y)
