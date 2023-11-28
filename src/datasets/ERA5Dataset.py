@@ -53,7 +53,7 @@ class ERA5Dataset(WeatherDataset):
 
         return TrainingDataset, ValidationDataset, TestingDataset
 
-    def get_pairs(self, variable, use_wind=False):
+    def get_pairs(self, variable, use_wind=True):
         """Method to separate data into inputs (X) and ends (y) for a given variable.
         For example: to use 4 previous days (X, hist=4) to predict the next day (y). The "pairs" are pairs of (X,y)
         inputs and ends.
@@ -96,6 +96,8 @@ class ERA5Dataset(WeatherDataset):
                 inps.append(var_files[i:i + self.history])
                 wind.append(wind_files[i])
 
+            print("inps", np.array(inps).shape)
+            print("ends", np.array(ends).shape)
             return np.array(inps), np.array(ends), np.array(wind)
 
     def plot_example_image(self, arr):
