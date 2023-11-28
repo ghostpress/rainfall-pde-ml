@@ -26,6 +26,9 @@ class WeatherDataset(Dataset):
         self.history = history
         self.hour = hour
 
+        get_wind = ("wind" in list(self.variable_ids.values()))
+        self.pairs = self.get_pairs(self.variable_ids[0], use_wind=get_wind)
+
     def __len__(self):
         """Method to return the length of the Dataset."""
         var = self.variable_ids[0]
@@ -40,12 +43,8 @@ class WeatherDataset(Dataset):
         """
         data = []
         get_wind = ("wind" in list(self.variable_ids.values()))
-        pairs = self.get_pairs(self.variable_ids[variable_id], use_wind=get_wind)
+        pairs = self.pairs #self.get_pairs(self.variable_ids[variable_id], use_wind=get_wind)
 
-        # FIXME: works for ERA5 data of shape (k, 4, 64, 64) or (k, 2, 64, 64) but not NEMO data of shape (k, 64, 64)
-        #print(len(pairs[0]))  # 48, one X of the pair for each region
-        #print(len(pairs[1]))  # 48, one y of the pair for each region
-        #print(pairs[0][0].shape)
         for i in range(len(pairs[0])):
             dat = self.load_data_from_files(pairs[0][i], index=self.hour)
             data.append(dat)
@@ -162,6 +161,7 @@ class WeatherDataset(Dataset):
 
         return np.array(data)
 
+    # FIXME: don't call get_pairs() in get_item() -> create pairs exactly once and index the pairs
     def get_pairs(self, variable, use_wind=False):
         """Method to separate data into inputs (X) and ends (y) for a given variable.
         For example: to use 4 previous days (X, hist=4) to predict the next day (y). The "pairs" are pairs of (X,y)
