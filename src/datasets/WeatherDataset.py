@@ -28,11 +28,12 @@ class WeatherDataset(Dataset):
 
         get_wind = ("wind" in list(self.variable_ids.values()))
         self.pairs = self.get_pairs(self.variable_ids[0], use_wind=get_wind)
+        assert len(self.pairs[0]) == len(self.pairs[1])
 
     def __len__(self):
         """Method to return the length of the Dataset."""
-        var = self.variable_ids[0]
-        return len(self.variable_files[var])
+        #var = self.variable_ids[0]
+        return len(self.pairs[0])#len(self.variable_files[var])
 
     def __getitem__(self, idx, variable_id=0):
         """Method to return Wthe (idx)th item in the Dataset, for each variable it contains.
