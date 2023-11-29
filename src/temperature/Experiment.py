@@ -3,18 +3,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import os
-
+import losses
 
 class Experiment():
 
-    def __init__(self, name, trainset, valset, testset, model, regloss, test_loss, optimizer, outdir, device):
+    def __init__(self, name, trainset, valset, testset, model, regloss, coeffs, windloss, test_loss, optimizer, outdir, device):
         self.name = name
         self.train_loader = trainset
         self.val_loader = valset
         self.test_loader = testset
         self.model = model
-        self.loss_fn = model.loss
+        self.loss_fn = losses.squared_error_loss #model.loss
         self.regloss = regloss
+        self.coeffs = coeffs
+        self.windloss = windloss
         self.test_loss = test_loss
         self.optimizer = optimizer
 
@@ -24,7 +26,6 @@ class Experiment():
 
         # Set up a directory for the experiment
         self.dir_setup(outdir)
-
         self.device = device
 
     def dir_setup(self, parent):
@@ -43,29 +44,57 @@ class Experiment():
 
         losses = []
 
-        for batch, (X, y) in enumerate(self.train_loader):
-            # Compute prediction and loss
-            X = X.to(self.device)
-            y = y.to(self.device)
+        if not self.windloss:
+            for batch, (X, y) in enumerate(self.train_loader):
+                # Compute prediction and loss
+                X = X.to(self.device)
+                y = y.to(self.device)
 
-            outputs = self.model(X)
+                outputs = self.model(X)
 
-            wind = outputs[0]
-            y_pred = outputs[1]
+                w_pred = outputs[0]
+                y_pred = outputs[1]
 
-            if self.regloss:
-                loss = self.loss_fn(y_pred, y, wind, self.regloss)
-            else:
-                loss = self.loss_fn(y_pred, y, self.regloss)
+                loss = self.loss_fn(y_pred, y, reg=self.regloss, w_pred=w_pred, coeffs=self.coeffs)
 
-            losses.append(loss.item())
+                #if self.regloss:
+                #    loss = self.loss_fn(y_pred, y, w_pred, self.regloss)
+                #else:
+                #    loss = self.loss_fn(y_pred, y, self.regloss)
 
-            print("Step:", batch, "Loss:", loss)
+                losses.append(loss.item())
 
-            # Backpropagation
-            loss.backward()
-            self.optimizer.step()
-            self.optimizer.zero_grad()
+                # Backpropagation
+                loss.backward()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+        else:
+            for batch, (X, y, W) in enumerate(self.train_loader):
+                # Compute prediction and loss
+                X = X.to(self.device)
+                y = y.to(self.device)
+                W = W.to(self.device)
+
+                outputs = self.model(X)
+
+                w_pred = outputs[0]
+                y_pred = outputs[1]
+
+                loss = self.loss_fn(y_pred, y, reg=self.regloss, w_pred=w_pred, coeffs=self.coeffs, wdl=self.windloss, w=W)
+
+                #if self.regloss:
+                #    loss = self.loss_fn(y_pred, y, w_pred, self.regloss)
+                #else:
+                #    loss = self.loss_fn(y_pred, y, self.regloss)
+
+                losses.append(loss.item())
+
+                #print("Step:", batch, "Loss:", loss)
+
+                # Backpropagation
+                loss.backward()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
 
         return losses
 
