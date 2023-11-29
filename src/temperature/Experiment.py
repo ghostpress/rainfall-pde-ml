@@ -186,8 +186,10 @@ class Experiment():
                 ax[0].set_title("Ground truth")
                 ax[1].imshow(y_pred[0].cpu())
                 ax[1].set_title("Prediction")
+                #plt.show()
 
                 fig.savefig(self.outdir + "/images/" + fname + "_" + str(idx) + ".png")
+                plt.close()
 
     def plot_loss(self, title, xlab, legend_items, fname):
         losses_to_plot = [self.train_losses, self.val_losses]
