@@ -59,7 +59,7 @@ class NemoDataset(WeatherDataset):
         regions.sort()
         return regions
 
-    def get_pairs(self, variable, use_wind=False):#(self, files, history=1, use_wind=False):
+    def get_pairs(self, variable, use_wind=False):
         """Method to separate data into inputs (X) and ends (y), for example to use 4 previous days (hist=4) to
         predict the next day. The "pairs" are pairs of (X,y) inputs and ends. This method works on one region at a time.
 
@@ -97,8 +97,6 @@ class NemoDataset(WeatherDataset):
         final_ends = np.array(final_ends)
 
         # Flatten arrays along region axis, while still keeping regions in correct order for (X,y) pairs
-        #print("inps", final_inps.shape)
-        #print("ends", final_ends.shape)
         nreg = final_inps.shape[0]
         ndays = final_inps.shape[1]
         inps = final_inps.reshape((nreg*ndays, final_inps.shape[2]))

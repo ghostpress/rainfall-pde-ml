@@ -96,8 +96,6 @@ class ERA5Dataset(WeatherDataset):
                 inps.append(var_files[i:i + self.history])
                 wind.append(wind_files[i])
 
-            print("inps", np.array(inps).shape)
-            print("ends", np.array(ends).shape)
             return np.array(inps), np.array(ends), np.array(wind)
 
     def plot_example_image(self, arr):
