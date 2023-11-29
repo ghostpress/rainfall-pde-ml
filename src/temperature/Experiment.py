@@ -109,7 +109,7 @@ class Experiment():
                 y_pred = outputs[1]
 
                 step_loss = self.test_loss(y_pred, y).item()
-                print("Item:", num_loops, "Loss:", step_loss)
+                #print("Item:", num_loops, "Loss:", step_loss)
                 losses.append(step_loss)
                 num_loops += 1
 
