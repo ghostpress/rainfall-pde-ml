@@ -3,6 +3,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import os
+
+from tqdm import trange
+
 import src.temperature.losses as losses
 
 class Experiment():
@@ -177,29 +180,29 @@ class Experiment():
 
         print("Training over " + str(epochs) + " epochs...")
 
-        for t in range(epochs):
-            print(f"Epoch {t}\n-------------------------------")
+        for epoch in trange(epochs, desc="Training", unit="Epoch"): #for t in range(epochs):
+            #print(f"Epoch {t}\n-------------------------------")  # remove
 
-            start = datetime.datetime.now()
+            #start = datetime.datetime.now()  # remove
             epoch_losses = self.train_loop()
             epoch_mean = np.round(np.mean(epoch_losses), 5)
 
-            fname = self.outdir + "/losses/train_epoch_" + str(t)
+            fname = self.outdir + "/losses/train_epoch_" + str(epoch)  
             self.save_results(epoch_losses, fname)
 
             val_loss = np.round(self.val_loop(), 5)
-            fname = self.outdir + "/losses/val_epoch_" + str(t)
+            fname = self.outdir + "/losses/val_epoch_" + str(epoch)
             self.save_results(val_loss, fname)
 
             print("Mean Training Loss:", epoch_mean)
             print("Validation Loss: ", val_loss)
-            print("Epoch Runtime:", datetime.datetime.now() - start)
+            #print("Epoch Runtime:", datetime.datetime.now() - start)  # remove
 
             self.train_losses.append(epoch_mean)
             self.val_losses.append(val_loss)
 
-            if t % 10 == 0:
-                self.save_model_state(t)
+            if epoch % 100 == 0: #if t % 10 == 0: 
+                self.save_model_state(epoch)
 
         self.save_results(self.train_losses, self.outdir + "/losses/mean_train_losses")
         self.save_results(self.val_losses, self.outdir + "/losses/mean_val_losses")
