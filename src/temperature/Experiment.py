@@ -3,20 +3,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import os
-
-from tqdm import trange
-
+import src.temperature.losses as losses
 
 class Experiment():
 
-    def __init__(self, name, trainset, valset, testset, model, regloss, test_loss, optimizer, outdir, device):
+    def __init__(self, name, trainset, valset, testset, model, regloss, test_loss, optimizer, outdir, device, coeffs=None, windloss=False):
         self.name = name
         self.train_loader = trainset
         self.val_loader = valset
         self.test_loader = testset
         self.model = model
-        self.loss_fn = model.loss
+        self.loss_fn = losses.squared_error_loss #model.loss
         self.regloss = regloss
+        self.coeffs = coeffs
+        self.windloss = windloss
         self.test_loss = test_loss
         self.optimizer = optimizer
 
@@ -44,29 +44,57 @@ class Experiment():
 
         losses = []
 
-        for batch, (X, y) in enumerate(self.train_loader):
-            # Compute prediction and loss
-            X = X.to(self.device)
-            y = y.to(self.device)
+        if not self.windloss:
+            for batch, (X, y) in enumerate(self.train_loader):
+                # Compute prediction and loss
+                X = X.to(self.device)
+                y = y.to(self.device)
 
-            outputs = self.model(X)
+                outputs = self.model(X)
 
-            wind = outputs[0]
-            y_pred = outputs[1]
+                w_pred = outputs[0]
+                y_pred = outputs[1]
 
-            if self.regloss:
-                loss = self.loss_fn(y_pred, y, wind, self.regloss)
-            else:
-                loss = self.loss_fn(y_pred, y, self.regloss)
+                loss = self.loss_fn(y_pred, y, reg=self.regloss, w_pred=w_pred, coeffs=self.coeffs)
 
-            losses.append(loss.item())
+                #if self.regloss:
+                #    loss = self.loss_fn(y_pred, y, w_pred, self.regloss)
+                #else:
+                #    loss = self.loss_fn(y_pred, y, self.regloss)
 
-            #print("Step:", batch, "Loss:", loss)
+                losses.append(loss.item())
 
-            # Backpropagation
-            loss.backward()
-            self.optimizer.step()
-            self.optimizer.zero_grad()
+                # Backpropagation
+                loss.backward()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+        else:
+            for batch, (X, y, W) in enumerate(self.train_loader):
+                # Compute prediction and loss
+                X = X.to(self.device)
+                y = y.to(self.device)
+                W = W.to(self.device)
+
+                outputs = self.model(X)
+
+                w_pred = outputs[0]
+                y_pred = outputs[1]
+
+                loss = self.loss_fn(y_pred, y, reg=self.regloss, w_pred=w_pred, coeffs=self.coeffs, wdl=self.windloss, w=W)
+
+                #if self.regloss:
+                #    loss = self.loss_fn(y_pred, y, w_pred, self.regloss)
+                #else:
+                #    loss = self.loss_fn(y_pred, y, self.regloss)
+
+                losses.append(loss.item())
+
+                #print("Step:", batch, "Loss:", loss)
+
+                # Backpropagation
+                loss.backward()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
 
         return losses
 
@@ -80,17 +108,28 @@ class Experiment():
         # Evaluating the model with torch.no_grad() ensures that no gradients are computed during test mode
         # also reduces unnecessary gradient computations and memory usage for tensors with requires_grad=True
         with torch.no_grad():
-            for X, y in self.val_loader:
-                X = X.to(self.device)
-                y = y.to(self.device)
-                outputs = self.model(X)
-                y_pred = outputs[1]
+            if not self.windloss:
+                for X, y in self.val_loader:
+                    X = X.to(self.device)
+                    y = y.to(self.device)
+                    outputs = self.model(X)
+                    y_pred = outputs[1]
 
-                step_loss = self.loss_fn(y_pred, y).item()
-                losses.append(step_loss)
-                num_loops += 1
+                    step_loss = self.loss_fn(y_pred, y).item()
+                    losses.append(step_loss)
+                    num_loops += 1
+                return np.mean(losses)
+            else:
+                for X, y, W in self.val_loader:
+                    X = X.to(self.device)
+                    y = y.to(self.device)
+                    outputs = self.model(X)
+                    y_pred = outputs[1]
 
-        return np.mean(losses)
+                    step_loss = self.loss_fn(y_pred, y).item()
+                    losses.append(step_loss)
+                    num_loops += 1
+                return np.mean(losses)
 
     def test(self):
         # Set the model to evaluation mode - important for batch normalization and dropout layers
@@ -109,7 +148,7 @@ class Experiment():
                 y_pred = outputs[1]
 
                 step_loss = self.test_loss(y_pred, y).item()
-                #print("Item:", num_loops, "Loss:", step_loss)
+                print("Item:", num_loops, "Loss:", step_loss)
                 losses.append(step_loss)
                 num_loops += 1
 
@@ -138,28 +177,32 @@ class Experiment():
 
         print("Training over " + str(epochs) + " epochs...")
 
-        for epoch in trange(epochs, desc="Training", unit="Epoch"):
+        for t in range(epochs):
+            print(f"Epoch {t}\n-------------------------------")
 
+            start = datetime.datetime.now()
             epoch_losses = self.train_loop()
             epoch_mean = np.round(np.mean(epoch_losses), 5)
-            fname = self.outdir + "/losses/train_epoch_" + str(epoch)
+
+            fname = self.outdir + "/losses/train_epoch_" + str(t)
             self.save_results(epoch_losses, fname)
-            
-            val_loss = np.round(np.mean(self.val_loop()), 5)
-            fname = self.outdir + "/losses/val_epoch_" + str(epoch)
+
+            val_loss = np.round(self.val_loop(), 5)
+            fname = self.outdir + "/losses/val_epoch_" + str(t)
             self.save_results(val_loss, fname)
-            
+
             print("Mean Training Loss:", epoch_mean)
-            print("Validation Loss:", val_loss)
-            
+            print("Validation Loss: ", val_loss)
+            print("Epoch Runtime:", datetime.datetime.now() - start)
+
             self.train_losses.append(epoch_mean)
             self.val_losses.append(val_loss)
-            
-            if epoch % 100 == 0:
-                self.save_model_state(epoch)
-                
-            self.save_results(self.train_losses, self.outdir + "/losses/mean_train_losses")
-            self.save_results(self.val_losses, self.outdir + "/losses/mean_val_losses")
+
+            if t % 10 == 0:
+                self.save_model_state(t)
+
+        self.save_results(self.train_losses, self.outdir + "/losses/mean_train_losses")
+        self.save_results(self.val_losses, self.outdir + "/losses/mean_val_losses")
 
         # -------------------- Testing ---------------------------
 
@@ -186,10 +229,8 @@ class Experiment():
                 ax[0].set_title("Ground truth")
                 ax[1].imshow(y_pred[0].cpu())
                 ax[1].set_title("Prediction")
-                #plt.show()
 
                 fig.savefig(self.outdir + "/images/" + fname + "_" + str(idx) + ".png")
-                plt.close()
 
     def plot_loss(self, title, xlab, legend_items, fname):
         losses_to_plot = [self.train_losses, self.val_losses]
