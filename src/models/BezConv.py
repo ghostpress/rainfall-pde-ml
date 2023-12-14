@@ -84,8 +84,12 @@ class BezConv(nn.Module):
         dec2 = self.dec2(torch.cat([dec3, F.interpolate(enc2, dec3.size()[2:], mode='bilinear')], 1))
         dec1 = self.dec1(torch.cat([dec2, F.interpolate(enc1, dec2.size()[2:], mode='bilinear')], 1))
         final = self.final(dec1)
+        #print("final", final.shape)
+        #print("max", final.max())
+        #print("min", final.min())
 
         wind = F.interpolate(final, x.size()[2:], mode='bilinear')
+        #print("wind", wind.shape)
 
         return wind
 
@@ -160,25 +164,4 @@ class BezConv(nn.Module):
         y_pred = self.warp(x, W, self.hist)
 
         return W, y_pred
-
-    def compute_regloss(self, f, dtype=torch.FloatTensor):
-        assert(len(self.coeffs) == 3)
-        gradient = reduce(torch.add, torch.gradient(f))
-
-        magnitude = torch.Tensor([torch.mean(torch.linalg.norm(f, axis=0, ord=2) ** 2)])
-        divergence = torch.Tensor([torch.mean(gradient.sum(0)**2)])
-        smoothness = torch.Tensor([torch.mean(torch.linalg.norm(gradient, axis=0, ord=2)**2)])
-        
-        reg_loss = self.coeffs[0]*magnitude.type(dtype)[0] + self.coeffs[1]*divergence.type(dtype)[0] + self.coeffs[2]*smoothness.type(dtype)[0]
-
-        return reg_loss
-
-    def loss(self, y_pred, y, w=None, reg=False):
-        assert(len(self.coeffs) == 3)
-        error = torch.sum((y_pred - y)**2, axis=1)
-        loss = torch.mean(error)
-
-        if reg:
-            loss += self.compute_regloss(w[0, :, :, :])
-
-        return loss
+    
