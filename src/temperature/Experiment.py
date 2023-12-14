@@ -49,7 +49,7 @@ class Experiment():
         losses = []
 
         if not self.windloss:
-            for batch, (X, y) in enumerate(self.train_loader):
+            for batch, (X, y, W) in enumerate(self.train_loader):
                 # Compute prediction and loss
                 X = X.to(self.device)
                 y = y.to(self.device)
@@ -113,7 +113,7 @@ class Experiment():
         # also reduces unnecessary gradient computations and memory usage for tensors with requires_grad=True
         with torch.no_grad():
             if not self.windloss:
-                for X, y in self.val_loader:
+                for X, y, W in self.val_loader:
                     X = X.to(self.device)
                     y = y.to(self.device)
                     outputs = self.model(X)
@@ -213,7 +213,7 @@ class Experiment():
         # Evaluating the model with torch.no_grad() ensures that no gradients are computed during test mode
         with torch.no_grad():
             if not self.windloss:
-                for idx, (X, y) in enumerate(examples):
+                for idx, (X, y, W) in enumerate(examples):
                     X = X.to(self.device)
                     y = y.to(self.device)
 
@@ -221,19 +221,33 @@ class Experiment():
                         self.model.cuda()
 
                     outputs = self.model(X)
-
+                    W_pred = outputs[0]
                     y_pred = outputs[1]
 
                     step_loss = self.test_loss(y_pred, y).item()
 
                     # TODO: in SST case, add predicted wind field to plots
-                    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(8, 8))
-                    ax[0].imshow(y[0].cpu())
-                    ax[0].set_title("Ground truth")
-                    fig.colorbar(ax[0])
-                    ax[1].imshow(y_pred[0].cpu())
-                    ax[1].set_title("Prediction")
-                    fig.colorbar(ax[1])
+                    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(8, 8))
+                    ax1 = axes[0][0]
+                    ax2 = axes[0][1]
+                    ax3 = axes[1][0]
+                    ax4 = axes[1][1]
+                    
+                    yplot = ax1.imshow(y[0].cpu())
+                    ax1.set_title("Ground truth")
+                    fig.colorbar(yplot, ax=ax1)
+                    
+                    ypred_plot = ax2.imshow(y_pred[0].cpu())
+                    ax2.set_title("Prediction")
+                    fig.colorbar(ypred_plot, ax=ax2)
+                    
+                    wupred_plot = ax3.imshow(W_pred[0][0].cpu(), cmap="magma")
+                    ax3.set_title("W(u) Prediction")
+                    fig.colorbar(wupred_plot, ax=ax3)
+                    
+                    wvpred_plot = ax4.imshow(W_pred[0][1].cpu(), cmap="magma")
+                    ax4.set_title("W(v) Prediction")
+                    fig.colorbar(wvpred_plot, ax=ax4)
 
                     fig.savefig(self.outdir + "/images/" + fname + "_" + str(idx) + ".png")
                     plt.close()
