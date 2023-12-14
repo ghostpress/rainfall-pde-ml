@@ -90,11 +90,10 @@ class ERA5Dataset(WeatherDataset):
 
             inps = []
             ends = var_files[self.history:]
-            wind = []
+            wind = wind_files[self.history:]  # use future wind to constrain predicted wind
 
             for i in range(n - self.history):
                 inps.append(var_files[i:i + self.history])
-                wind.append(wind_files[i])
 
             return np.array(inps), np.array(ends), np.array(wind)
 
