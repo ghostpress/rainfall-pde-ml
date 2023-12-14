@@ -16,7 +16,7 @@ class Experiment():
         self.val_loader = valset
         self.test_loader = testset
         self.model = model
-        self.loss_fn = losses.squared_error_loss #model.loss
+        self.loss_fn = losses.squared_error_loss 
         self.regloss = regloss
         self.coeffs = coeffs
         self.windloss = windloss
@@ -39,6 +39,7 @@ class Experiment():
         os.mkdir(self.outdir + "/" + "images")
         os.mkdir(self.outdir + "/" + "losses")
 
+    # TODO: print loss components, eg. regloss for each term and windloss in addition to total loss
     def train_loop(self):
         size = len(self.train_loader.dataset)
         # Set the model to training mode - important for batch normalization and dropout layers
@@ -180,10 +181,8 @@ class Experiment():
 
         print("Training over " + str(epochs) + " epochs...")
 
-        for epoch in trange(epochs, desc="Training", unit="Epoch"): #for t in range(epochs):
-            #print(f"Epoch {t}\n-------------------------------")  # remove
+        for epoch in trange(epochs, desc="Training", unit="Epoch"): 
 
-            #start = datetime.datetime.now()  # remove
             epoch_losses = self.train_loop()
             epoch_mean = np.round(np.mean(epoch_losses), 5)
 
@@ -196,12 +195,11 @@ class Experiment():
 
             print("Mean Training Loss:", epoch_mean)
             print("Validation Loss: ", val_loss)
-            #print("Epoch Runtime:", datetime.datetime.now() - start)  # remove
 
             self.train_losses.append(epoch_mean)
             self.val_losses.append(val_loss)
 
-            if epoch % 100 == 0: #if t % 10 == 0: 
+            if epoch % 100 == 0:  
                 self.save_model_state(epoch)
 
         self.save_results(self.train_losses, self.outdir + "/losses/mean_train_losses")
@@ -214,26 +212,81 @@ class Experiment():
 
         # Evaluating the model with torch.no_grad() ensures that no gradients are computed during test mode
         with torch.no_grad():
-            for idx, (X, y) in enumerate(examples):
-                X = X.to(self.device)
-                y = y.to(self.device)
+            if not self.windloss:
+                for idx, (X, y) in enumerate(examples):
+                    X = X.to(self.device)
+                    y = y.to(self.device)
 
-                if torch.cuda.is_available():
-                    self.model.cuda()
+                    if torch.cuda.is_available():
+                        self.model.cuda()
 
-                outputs = self.model(X)
+                    outputs = self.model(X)
 
-                y_pred = outputs[1]
+                    y_pred = outputs[1]
 
-                step_loss = self.test_loss(y_pred, y).item()
+                    step_loss = self.test_loss(y_pred, y).item()
 
-                fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(8, 8))
-                ax[0].imshow(y[0].cpu())
-                ax[0].set_title("Ground truth")
-                ax[1].imshow(y_pred[0].cpu())
-                ax[1].set_title("Prediction")
+                    # TODO: in SST case, add predicted wind field to plots
+                    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(8, 8))
+                    ax[0].imshow(y[0].cpu())
+                    ax[0].set_title("Ground truth")
+                    fig.colorbar(ax[0])
+                    ax[1].imshow(y_pred[0].cpu())
+                    ax[1].set_title("Prediction")
+                    fig.colorbar(ax[1])
 
-                fig.savefig(self.outdir + "/images/" + fname + "_" + str(idx) + ".png")
+                    fig.savefig(self.outdir + "/images/" + fname + "_" + str(idx) + ".png")
+                    plt.close()
+            else:
+                for idx, (X, y, W) in enumerate(examples):
+                    X = X.to(self.device)
+                    W = W.to(self.device)
+                    y = y.to(self.device)
+
+                    if torch.cuda.is_available():
+                        self.model.cuda()
+
+                    outputs = self.model(X)  # outputs W, y_pred
+
+                    W_pred = outputs[0]        
+                    y_pred = outputs[1]
+
+                    step_loss = self.test_loss(y_pred, y).item()
+
+                    fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(8, 12))
+                    ax1 = axes[0][0]
+                    ax2 = axes[0][1]
+                    ax3 = axes[1][0]
+                    ax4 = axes[1][1]
+                    ax5 = axes[2][0]
+                    ax6 = axes[2][1]
+                    
+                    # y vs y_pred
+                    y_plot = ax1.imshow(y[0].cpu())  
+                    ax1.set_title("Temperature Ground truth")
+                    fig.colorbar(y_plot, ax=ax1)
+                    ypred_plot = ax2.imshow(y_pred[0].cpu())  
+                    ax2.set_title("Temperature Prediction")
+                    fig.colorbar(ypred_plot, ax=ax2)
+                    
+                    # w_u vs w_u_pred
+                    wu_plot = ax3.imshow(W[0][0].cpu(), cmap="magma")  
+                    ax3.set_title("W(u) Ground truth")
+                    fig.colorbar(wu_plot, ax=ax3)
+                    wupred_plot = ax4.imshow(W_pred[0][0].cpu(), cmap="magma")  
+                    ax4.set_title("W(u) Prediction")
+                    fig.colorbar(wupred_plot, ax=ax4)
+                    
+                    # w_v vs w_v_pred
+                    wv_plot = ax5.imshow(W[0][1].cpu(), cmap="magma")  
+                    ax5.set_title("W(v) Ground truth")
+                    fig.colorbar(wv_plot, ax=ax5)
+                    wvpred_plot = ax6.imshow(W_pred[0][1].cpu(), cmap="magma")  
+                    ax6.set_title("W(v) Prediction")
+                    fig.colorbar(wvpred_plot, ax=ax6)
+
+                    fig.savefig(self.outdir + "/images/" + fname + "_" + str(idx) + ".png")
+                    plt.close()
 
     def plot_loss(self, title, xlab, legend_items, fname):
         losses_to_plot = [self.train_losses, self.val_losses]
@@ -246,3 +299,4 @@ class Experiment():
         plt.legend(legend_items, loc="upper left")
 
         plt.savefig(self.outdir + "/images/" + fname + ".png")
+        plt.close()
