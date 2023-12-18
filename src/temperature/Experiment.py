@@ -10,26 +10,31 @@ import src.temperature.losses as losses
 
 class Experiment():
 
-    def __init__(self, name, trainset, valset, testset, model, regloss, test_loss, optimizer, outdir, device, coeffs=None, windloss=False):
+    def __init__(self, name, trainset, valset, testset, model, test_loss, optimizer, outdir, device, regloss=False, coeffs=None, windloss=False, numvars=2):
         self.name = name
         self.train_loader = trainset
         self.val_loader = valset
         self.test_loader = testset
         self.model = model
+        self.test_loss = test_loss
+        self.optimizer = optimizer
+        
+        # Set up a directory for the experiment
+        self.dir_setup(outdir)
+        self.device = device
+        
         self.loss_fn = losses.squared_error_loss 
+        
         self.regloss = regloss
         self.coeffs = coeffs
         self.windloss = windloss
-        self.test_loss = test_loss
-        self.optimizer = optimizer
 
         self.train_losses = []
         self.val_losses = []
         self.test_losses = []
 
-        # Set up a directory for the experiment
-        self.dir_setup(outdir)
-        self.device = device
+        # Check how many items the DataLoaders contain
+        self.num_vars = numvars #len(next(iter(trainset)))
 
     def dir_setup(self, parent):
         self.outdir = parent + "/" + self.name
@@ -47,9 +52,12 @@ class Experiment():
         self.model.train()
 
         losses = []
+        
+        # Case 1: SST data, no wind
+        if self.num_vars == 2:
 
-        if not self.windloss:
-            for batch, (X, y, W) in enumerate(self.train_loader):
+        #if not self.wind_in_data:
+            for batch, (X, y) in enumerate(self.train_loader):
                 # Compute prediction and loss
                 X = X.to(self.device)
                 y = y.to(self.device)
@@ -60,12 +68,6 @@ class Experiment():
                 y_pred = outputs[1]
 
                 loss = self.loss_fn(y_pred, y, reg=self.regloss, w_pred=w_pred, coeffs=self.coeffs)
-
-                #if self.regloss:
-                #    loss = self.loss_fn(y_pred, y, w_pred, self.regloss)
-                #else:
-                #    loss = self.loss_fn(y_pred, y, self.regloss)
-
                 losses.append(loss.item())
 
                 # Backpropagation
@@ -85,15 +87,7 @@ class Experiment():
                 y_pred = outputs[1]
 
                 loss = self.loss_fn(y_pred, y, reg=self.regloss, w_pred=w_pred, coeffs=self.coeffs, wdl=self.windloss, w=W)
-
-                #if self.regloss:
-                #    loss = self.loss_fn(y_pred, y, w_pred, self.regloss)
-                #else:
-                #    loss = self.loss_fn(y_pred, y, self.regloss)
-
                 losses.append(loss.item())
-
-                #print("Step:", batch, "Loss:", loss)
 
                 # Backpropagation
                 loss.backward()
@@ -112,8 +106,8 @@ class Experiment():
         # Evaluating the model with torch.no_grad() ensures that no gradients are computed during test mode
         # also reduces unnecessary gradient computations and memory usage for tensors with requires_grad=True
         with torch.no_grad():
-            if not self.windloss:
-                for X, y, W in self.val_loader:
+            if self.num_vars == 2: #not self.wind_in_data:
+                for X, y in self.val_loader:
                     X = X.to(self.device)
                     y = y.to(self.device)
                     outputs = self.model(X)
@@ -127,10 +121,12 @@ class Experiment():
                 for X, y, W in self.val_loader:
                     X = X.to(self.device)
                     y = y.to(self.device)
+                    W = W.to(self.device)
                     outputs = self.model(X)
+                    w_pred = outputs[0]
                     y_pred = outputs[1]
 
-                    step_loss = self.loss_fn(y_pred, y).item()
+                    step_loss = self.loss_fn(y_pred, y, wdl=self.windloss, w_pred=w_pred, w=W).item()
                     losses.append(step_loss)
                     num_loops += 1
                 return np.mean(losses)
@@ -145,16 +141,28 @@ class Experiment():
         # Evaluating the model with torch.no_grad() ensures that no gradients are computed during test mode
         # also reduces unnecessary gradient computations and memory usage for tensors with requires_grad=True
         with torch.no_grad():
-            for X, y in self.test_loader:
-                X = X.to(self.device)
-                y = y.to(self.device)
-                outputs = self.model(X)
-                y_pred = outputs[1]
+            if self.num_vars == 2: #not self.wind_in_data:
+                for X, y in self.test_loader:
+                    X = X.to(self.device)
+                    y = y.to(self.device)
+                    outputs = self.model(X)
+                    y_pred = outputs[1]
 
-                step_loss = self.test_loss(y_pred, y).item()
-                print("Item:", num_loops, "Loss:", step_loss)
-                losses.append(step_loss)
-                num_loops += 1
+                    step_loss = self.test_loss(y_pred, y).item()
+                    print("Item:", num_loops, "Loss:", step_loss)
+                    losses.append(step_loss)
+                    num_loops += 1
+            else:
+                for X, y, W in self.test_loader:
+                    X = X.to(self.device)
+                    y = y.to(self.device)
+                    outputs = self.model(X)
+                    y_pred = outputs[1]
+
+                    step_loss = self.test_loss(y_pred, y).item()
+                    print("Item:", num_loops, "Loss:", step_loss)
+                    losses.append(step_loss)
+                    num_loops += 1
 
         return losses
 
@@ -212,8 +220,8 @@ class Experiment():
 
         # Evaluating the model with torch.no_grad() ensures that no gradients are computed during test mode
         with torch.no_grad():
-            if not self.windloss:
-                for idx, (X, y, W) in enumerate(examples):
+            if self.num_vars == 2: #not self.wind_in_data:
+                for idx, (X, y) in enumerate(examples):
                     X = X.to(self.device)
                     y = y.to(self.device)
 
@@ -224,30 +232,46 @@ class Experiment():
                     W_pred = outputs[0]
                     y_pred = outputs[1]
 
-                    step_loss = self.test_loss(y_pred, y).item()
+                    #step_loss = self.test_loss(y_pred, y).item()
 
-                    # TODO: in SST case, add predicted wind field to plots
-                    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(8, 8))
+                    fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(8, 12))
                     ax1 = axes[0][0]
                     ax2 = axes[0][1]
                     ax3 = axes[1][0]
                     ax4 = axes[1][1]
+                    ax5 = axes[2][0]
+                    ax6 = axes[2][1]
                     
-                    yplot = ax1.imshow(y[0].cpu())
-                    ax1.set_title("Ground truth")
-                    fig.colorbar(yplot, ax=ax1)
+                    # X[2] and X[3] (second-to-last and last input days)
+                    x2_plot = ax1.imshow(X[0][2].cpu())
+                    ax1.set_title("Penultimate Input Image")
+                    fig.colorbar(x2_plot, ax=ax1)
+                    ax1.set(yticks=[0,20,40,60])
                     
-                    ypred_plot = ax2.imshow(y_pred[0].cpu())
-                    ax2.set_title("Prediction")
-                    fig.colorbar(ypred_plot, ax=ax2)
+                    x3_plot = ax2.imshow(X[0][3].cpu())
+                    ax2.set_title("Last Input Image")
+                    fig.colorbar(x3_plot, ax=ax2)
+                    ax2.set(yticks=[0,20,40,60])
                     
-                    wupred_plot = ax3.imshow(W_pred[0][0].cpu(), cmap="magma")
-                    ax3.set_title("W(u) Prediction")
-                    fig.colorbar(wupred_plot, ax=ax3)
+                    yplot = ax3.imshow(y[0].cpu())
+                    ax3.set_title("Ground truth")
+                    fig.colorbar(yplot, ax=ax3)
+                    ax3.set(yticks=[0,20,40,60])
                     
-                    wvpred_plot = ax4.imshow(W_pred[0][1].cpu(), cmap="magma")
-                    ax4.set_title("W(v) Prediction")
-                    fig.colorbar(wvpred_plot, ax=ax4)
+                    ypred_plot = ax4.imshow(y_pred[0].cpu())
+                    ax4.set_title("Prediction")
+                    fig.colorbar(ypred_plot, ax=ax4)
+                    ax4.set(yticks=[0,20,40,60])
+                    
+                    wupred_plot = ax5.imshow(W_pred[0][0].cpu(), cmap="magma")
+                    ax5.set_title("W(u) Prediction")
+                    fig.colorbar(wupred_plot, ax=ax5)
+                    ax5.set(yticks=[0,20,40,60])
+                    
+                    wvpred_plot = ax6.imshow(W_pred[0][1].cpu(), cmap="magma")
+                    ax6.set_title("W(v) Prediction")
+                    fig.colorbar(wvpred_plot, ax=ax6)
+                    ax6.set(yticks=[0,20,40,60])
 
                     fig.savefig(self.outdir + "/images/" + fname + "_" + str(idx) + ".png")
                     plt.close()
@@ -265,39 +289,61 @@ class Experiment():
                     W_pred = outputs[0]        
                     y_pred = outputs[1]
 
-                    step_loss = self.test_loss(y_pred, y).item()
+                    #step_loss = self.test_loss(y_pred, y).item()
 
-                    fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(8, 12))
+                    fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(8, 16))
                     ax1 = axes[0][0]
                     ax2 = axes[0][1]
                     ax3 = axes[1][0]
                     ax4 = axes[1][1]
                     ax5 = axes[2][0]
                     ax6 = axes[2][1]
+                    ax7 = axes[3][0]
+                    ax8 = axes[3][1]
+                    
+                    # X[2] and X[3] (second-to-last and last input days)
+                    x2_plot = ax1.imshow(X[0][2].cpu())
+                    ax1.set_title("Penultimate Input Image")
+                    fig.colorbar(x2_plot, ax=ax1)
+                    ax1.set(yticks=[0,20,40,60])
+                    
+                    x3_plot = ax2.imshow(X[0][3].cpu())
+                    ax2.set_title("Last Input Image")
+                    fig.colorbar(x3_plot, ax=ax2)
+                    ax2.set(yticks=[0,20,40,60])
                     
                     # y vs y_pred
-                    y_plot = ax1.imshow(y[0].cpu())  
-                    ax1.set_title("Temperature Ground truth")
-                    fig.colorbar(y_plot, ax=ax1)
-                    ypred_plot = ax2.imshow(y_pred[0].cpu())  
-                    ax2.set_title("Temperature Prediction")
-                    fig.colorbar(ypred_plot, ax=ax2)
+                    y_plot = ax3.imshow(y[0].cpu())  
+                    ax3.set_title("Temperature Ground truth")
+                    fig.colorbar(y_plot, ax=ax3)
+                    ax3.set(yticks=[0,20,40,60])
+                    
+                    ypred_plot = ax4.imshow(y_pred[0].cpu())  
+                    ax4.set_title("Temperature Prediction")
+                    fig.colorbar(ypred_plot, ax=ax4)
+                    ax4.set(yticks=[0,20,40,60])
                     
                     # w_u vs w_u_pred
-                    wu_plot = ax3.imshow(W[0][0].cpu(), cmap="magma")  
-                    ax3.set_title("W(u) Ground truth")
-                    fig.colorbar(wu_plot, ax=ax3)
-                    wupred_plot = ax4.imshow(W_pred[0][0].cpu(), cmap="magma")  
-                    ax4.set_title("W(u) Prediction")
-                    fig.colorbar(wupred_plot, ax=ax4)
+                    wu_plot = ax5.imshow(W[0][0].cpu(), cmap="magma")  
+                    ax5.set_title("W(u) Ground truth")
+                    fig.colorbar(wu_plot, ax=ax5)
+                    ax5.set(yticks=[0,20,40,60])
+                    
+                    wupred_plot = ax6.imshow(W_pred[0][0].cpu(), cmap="magma")  
+                    ax6.set_title("W(u) Prediction")
+                    fig.colorbar(wupred_plot, ax=ax6)
+                    ax6.set(yticks=[0,20,40,60])
                     
                     # w_v vs w_v_pred
-                    wv_plot = ax5.imshow(W[0][1].cpu(), cmap="magma")  
-                    ax5.set_title("W(v) Ground truth")
-                    fig.colorbar(wv_plot, ax=ax5)
-                    wvpred_plot = ax6.imshow(W_pred[0][1].cpu(), cmap="magma")  
-                    ax6.set_title("W(v) Prediction")
-                    fig.colorbar(wvpred_plot, ax=ax6)
+                    wv_plot = ax7.imshow(W[0][1].cpu(), cmap="magma")  
+                    ax7.set_title("W(v) Ground truth")
+                    fig.colorbar(wv_plot, ax=ax7)
+                    ax7.set(yticks=[0,20,40,60])
+                    
+                    wvpred_plot = ax8.imshow(W_pred[0][1].cpu(), cmap="magma")  
+                    ax8.set_title("W(v) Prediction")
+                    fig.colorbar(wvpred_plot, ax=ax8)
+                    ax8.set(yticks=[0,20,40,60])
 
                     fig.savefig(self.outdir + "/images/" + fname + "_" + str(idx) + ".png")
                     plt.close()
@@ -314,3 +360,4 @@ class Experiment():
 
         plt.savefig(self.outdir + "/images/" + fname + ".png")
         plt.close()
+        
