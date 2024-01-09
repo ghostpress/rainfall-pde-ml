@@ -23,7 +23,7 @@ def print_info(files):
     pass
 
 
-def create_wind_series(files, variable_series, use_mask=False):
+def create_wind_series(files, variable_series, use_mask=False, start_from=0):
     series_u = nc.Dataset(files[0]).variables["u10"][:]
     series_v = nc.Dataset(files[0]).variables["v10"][:]
 
@@ -57,14 +57,14 @@ def create_wind_series(files, variable_series, use_mask=False):
         var.resize((var_u.shape[0], 2, var_u.shape[1], var_u.shape[2]))
         series = np.vstack((series, var))
 
+    series = series[start_from:, :, :, :]
     variable_series["wind"] = series
     pass
 
 
-def create_series(files, variable, variable_series, use_mask=False):
-
+def create_series(files, variable, variable_series, use_mask=False, start_from=0):
     if variable == "wind":
-        create_wind_series()
+        create_wind_series(files, variable_series, use_mask=use_mask, start_from=start_from)
     else:
         series = nc.Dataset(files[0]).variables[variable][:]
 
@@ -87,6 +87,7 @@ def create_series(files, variable, variable_series, use_mask=False):
 
             series = np.vstack((series, var))
 
+        series = series[start_from:, :, :]
         variable_series[variable] = series
     pass
 
@@ -100,18 +101,19 @@ def count_masked_variable(files, variable):
         if len(var.shape) > 3:
             var = var[:, 0, :, :]
 
-        masked = np.ma.masked_array.count(var)
-
+        masked = np.ma.count_masked(var)
+        total = var.size
         print("{num} masked values in file {file} along {v}".format(num=masked, file=f, v=variable))
+        print("{tot} total values in file {file} along {v}".format(tot=total, file=f, v=variable))
     pass
 
 
-def get_time(first_date, files):
+def get_time(first_date, files, start_from=0):
     time_vec = []
 
     for f in files:
         nc_obj = nc.Dataset(f)
-        time = nc_obj.variables["time"][:]
+        time = nc_obj.variables["time"][:] #[start_from:]
 
         for t in time:
             time_vec.append(datetime.timedelta(hours=int(t)) + first_date)
@@ -153,35 +155,12 @@ def resize_variables(variable_series):
     for name, var in resized.items():
 
         if len(var.shape) == 3:  # non-wind variables
-            #resized_img = np.empty((var.shape[0], 64, 64))
-            #for t in range(var.shape[0]):
-            #    temp1 = np.repeat(var[t], 2, axis=0)
-                #print("Intermediate shape:", temp1.shape)
-            #    temp2 = np.repeat(temp1, 3, axis=1)
-                #print("Intermediate shape:", temp2.shape)
-            #    temp3 = np.pad(temp2, pad_width=((2,2), (0,0)), mode="edge")
-                #print("Intermediate shape:", temp3.shape)
-            #    resized_img[t] = temp3[:, 0:64]
-                #print("Final shape:", resized_img[t].shape)
             temp1 = np.repeat(var, 2, axis=1)
             temp2 = np.repeat(temp1, 3, axis=2)
             temp3 = np.pad(temp2, pad_width=((0, 0), (2, 2), (0, 0)), mode="edge")
             resized_img = temp3[:, :, 0:64]
 
         else:
-            #resized_img = np.empty((var.shape[0], 2, 64, 64))
-            #for t in range(var.shape[0]):
-            #    uv = np.empty((2, 64, 64))
-            #    for w in range(2):
-            #        temp1 = np.repeat(var[t, w], 2, axis=0)
-                    #print("Intermediate shape:", temp1.shape)
-            #        temp2 = np.repeat(temp1, 3, axis=1)
-                    #print("Intermediate shape:", temp2.shape)
-            #        temp3 = np.pad(temp2, pad_width=((2, 2), (0, 0)), mode="edge")
-                    #print("Intermediate shape:", temp3.shape)
-            #        uv[w] = temp3[:, 0:64]
-            #    resized_img[t] = uv
-                #print("Final shape:", resized_img[t].shape)
             temp1 = np.repeat(var, 2, axis=2)
             temp2 = np.repeat(temp1, 3, axis=3)
             temp3 = np.pad(temp2, pad_width=((0, 0), (0, 0), (2, 2), (0, 0)), mode="edge")

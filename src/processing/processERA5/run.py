@@ -3,8 +3,11 @@ import datetime
 import functions
 
 # Set parameters
-nc_files = ["/home/lucia/projects/FORMES/rainfall-pde-ml/data/ERA5/file1.nc",
-            "/home/lucia/projects/FORMES/rainfall-pde-ml/data/ERA5/file2.nc"]
+nc_files = os.listdir("/home/lucia/projects/FORMES/rainfall-pde-ml/data/ERA5/all/")
+nc_files.sort()
+for i in range(len(nc_files)):
+    nc_files[i] = "/home/lucia/projects/FORMES/rainfall-pde-ml/data/ERA5/all/" + nc_files[i]
+
 out_path = "/home/lucia/projects/FORMES/rainfall-pde-ml/data/era5_npy/"
 daily_out_path = "/home/lucia/projects/FORMES/rainfall-pde-ml/data/era5_daily_npy/"
 first = datetime.datetime(1900, 1, 1, hour=0, minute=0, second=0)  # time units for ERA5 data are hours since this date
@@ -12,33 +15,62 @@ mask = False
 
 # Get dataset information
 functions.print_info(nc_files)
-functions.count_masked_variable(nc_files, "t2m")
+variable_names = {"u10": "wind_u", "v10": "wind_v", "d2m": "dewTemp", "t2m": "temperature", "e": "evaporation",
+                  "z": "geopotential", "sp": "pressure", "tcc": "totalCloudClover", "tp": "precipitation",
+                  "fdir": "solarRadiation"}
+
+for vname in variable_names.keys():
+    functions.count_masked_variable(nc_files, vname)
+
 time = functions.get_time(first, nc_files)
 
 # Load weather variables into a dictionary
-precip_series = dict()
-functions.create_series(nc_files, "t2m", precip_series, use_mask=mask)  # temperature at 2m
-functions.create_wind_series(nc_files, precip_series, use_mask=mask)    # wind, u and v components
-functions.create_series(nc_files, "tp", precip_series, use_mask=mask)   # total precipitation
-functions.create_series(nc_files, "sp", precip_series, use_mask=mask)   # surface pressure
+created_wind = False
+saved_wind = False
 
-# Rescale rainfall from m to cm
-functions.scale_variable(precip_series, "tp", 100)
+for vname in variable_names.keys():
+    print("Processing variable", vname, ":", variable_names[vname])
+    # One variable at a time, to conserve memory
+    precip_series = dict()
 
-resized_series = functions.resize_variables(precip_series)
+    if (vname == "u10" or vname == "v10") and not created_wind:
+        functions.create_wind_series(nc_files, precip_series, use_mask=mask, start_from=29220)
+        created_wind = True
 
-# Save originally-sized arrays to daily files (in new directory for each variable)
-functions.save_to_file(daily_out_path + "wind/", time, precip_series, "wind", one_series=False, resized=False, use_mask=mask)
-functions.save_to_file(daily_out_path + "pressure/", time, precip_series, "sp", one_series=False, resized=False, use_mask=mask)
+    elif (vname == "u10" or vname == "v10") and created_wind:
+        pass
+    else:
+        functions.create_series(nc_files, vname, precip_series, use_mask=mask, start_from=29220)
 
-# Save resized arrays to daily files (in new directory for each variable)
-functions.save_to_file(daily_out_path + "temperature_resized/", time, resized_series, "t2m", one_series=False, resized=True, use_mask=mask)
-functions.save_to_file(daily_out_path + "wind_resized/", time, resized_series, "wind", one_series=False, resized=True, use_mask=mask)
-functions.save_to_file(daily_out_path + "precipitation_resized/", time, resized_series, "tp", one_series=False, resized=True, use_mask=mask)
-functions.save_to_file(daily_out_path + "pressure_resized/", time, resized_series, "sp", one_series=False, resized=True, use_mask=mask)
+    # Rescale rainfall from m to cm
+    if vname == "tp":
+        functions.scale_variable(precip_series, "tp", 100)
 
-# Save full padded arrays to file
-functions.save_to_file(out_path, time, resized_series, "t2m", one_series=True, resized=True, use_mask=mask)
-functions.save_to_file(out_path, time, resized_series, "wind", one_series=True, resized=True, use_mask=mask)
-functions.save_to_file(out_path, time, resized_series, "tp", one_series=True, resized=True, use_mask=mask)
-functions.save_to_file(out_path, time, resized_series, "sp", one_series=True, resized=True, use_mask=mask)
+    # Resize variables
+    resized_series = functions.resize_variables(precip_series)
+
+    # Create new directory for each variable & save to daily files
+    if (vname == "u10" or vname == "v10") and not saved_wind:  # wind only
+        # Original size
+        newdir = daily_out_path + "wind/"
+        os.mkdir(newdir)
+        functions.save_to_file(newdir, time, precip_series, "wind", one_series=False, resized=False, use_mask=mask)
+
+        # Resized
+        newdir = daily_out_path + "wind_resized/"
+        os.mkdir(newdir)
+        functions.save_to_file(newdir, time, resized_series, "wind", one_series=False, resized=False, use_mask=mask)
+
+        saved_wind = True
+    elif (vname == "u10" or vname == "v10") and saved_wind:
+        pass
+    else:
+        # Original size
+        newdir = daily_out_path + variable_names[vname] + "/"
+        os.mkdir(newdir)
+        functions.save_to_file(newdir, time, precip_series, vname, one_series=False, resized=False, use_mask=mask)
+
+        # Resized
+        newdir = daily_out_path + variable_names[vname] + "_resized/"
+        os.mkdir(newdir)
+        functions.save_to_file(newdir, time, resized_series, vname, one_series=False, resized=False, use_mask=mask)
