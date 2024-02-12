@@ -15,12 +15,16 @@ mask = False
 
 # Get dataset information
 functions.print_info(nc_files)
-variable_names = {"u10": "wind_u", "v10": "wind_v", "d2m": "dewTemp", "t2m": "temperature", "e": "evaporation",
-                  "z": "geopotential", "sp": "pressure", "tcc": "totalCloudClover", "tp": "precipitation",
-                  "fdir": "solarRadiation"}
+#exit(0)
+#variable_names = {"u10": "wind_u", "v10": "wind_v", "d2m": "dewTemp", "t2m": "temperature", "e": "evaporation",
+#                  "z": "geopotential", "sp": "pressure", "tcc": "totalCloudClover", "tp": "precipitation",
+#                  "fdir": "solarRadiation"}
 
-for vname in variable_names.keys():
-    functions.count_masked_variable(nc_files, vname)
+variable_names = {"t2m": "temperature", "sp": "pressure", "tp": "precipitation", "d2m": "dewTemp"}
+laplace_vars = ["t2m", "sp", "tp", "d2m"]
+
+#for vname in variable_names.keys():
+#    functions.count_masked_variable(nc_files, vname)
 
 time = functions.get_time(first, nc_files)
 
@@ -45,6 +49,11 @@ for vname in variable_names.keys():
     # Rescale rainfall from m to cm
     if vname == "tp":
         functions.scale_variable(precip_series, "tp", 100)
+
+    laplace = functions.compute_laplacian(precip_series[vname], vname, (10, 12))  # testing
+    print(laplace.shape)
+    print(laplace)
+    exit(0)
 
     # Resize variables
     resized_series = functions.resize_variables(precip_series)

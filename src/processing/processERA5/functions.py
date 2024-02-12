@@ -148,6 +148,83 @@ def add_to_variable(variable_series, variable, summand):
     return variable_series
 
 
+def compute_laplacian(var_array, var_name, loc):
+
+    assert(len(loc) == 2)
+
+    print("Computing Laplacian for variable " + var_name)
+    var_shape = np.array(var_array.shape)
+    row_border = var_shape[1]-1  # 29 or 63
+    col_border = var_shape[2]-1  # 22 or 63
+
+    try:
+        center = var_array[:, loc[0], loc[1]]
+    except IndexError:
+        print("The chosen location is out of bounds, please choose indices within " + str(var_shape[1:]))
+        loc = [int(x) for x in input("New location (space between integer indices): ").split()]
+        center = var_array[:, loc[0], loc[1]]
+
+    north, south, east, west = None, None, None, None
+
+    # not on a corner/edge:
+    if (loc[0] not in [0, row_border]) and (loc[1] not in [0, col_border]):
+        north = var_array[:, loc[0] - 1, loc[1]]
+        south = var_array[:, loc[0] + 1, loc[1]]
+        east = var_array[:, loc[0], loc[1] + 1]
+        west = var_array[:, loc[0], loc[1] - 1]
+
+    # northwest corner
+    elif (loc[0] == 0) and (loc[1] == 0):
+        south = var_array[:, loc[0] + 1, loc[1]]
+        east = var_array[:, loc[0], loc[1] + 1]
+
+    # northeast corner
+    elif (loc[0] == row_border) and (loc[1] == 0):
+        south = var_array[:, loc[0] + 1, loc[1]]
+        west = var_array[:, loc[0], loc[1] - 1]
+
+    # southwest corner
+    elif (loc[0] == 0) and [loc[1] == col_border]:
+        north = var_array[:, loc[0] - 1, loc[1]]
+        east = var_array[:, loc[0], loc[1] + 1]
+
+    # southeast corner
+    elif (loc[0] == row_border) and (loc[1] == col_border):
+        north = var_array[:, loc[0] - 1, loc[1]]
+        west = var_array[:, loc[0], loc[1] - 1]
+
+    # north edge
+    elif loc[0] == 0:
+        south = var_array[:, loc[0] + 1, loc[1]]
+        east = var_array[:, loc[0], loc[1] + 1]
+        west = var_array[:, loc[0], loc[1] - 1]
+
+    # south edge
+    elif loc[0] == col_border:
+        north = var_array[:, loc[0] - 1, loc[1]]
+        east = var_array[:, loc[0], loc[1] + 1]
+        west = var_array[:, loc[0], loc[1] - 1]
+
+    # east edge
+    elif loc[1] == row_border:
+        north = var_array[:, loc[0] - 1, loc[1]]
+        south = var_array[:, loc[0] + 1, loc[1]]
+        west = var_array[:, loc[0], loc[1] - 1]
+
+    # west edge
+    elif loc[1] == 0:
+        north = var_array[:, loc[0] - 1, loc[1]]
+        south = var_array[:, loc[0] + 1, loc[1]]
+        east = var_array[:, loc[0], loc[1] + 1]
+
+    # out of bounds
+    else:
+        raise IndexError("The chosen location is out of bounds, please choose indices within " + var_shape[1, 2])
+
+    laplace = center - np.mean(np.array([north, south, east, west]), axis=0)
+    return laplace
+
+
 def resize_variables(variable_series):
     print("Resizing variables.")
     resized = variable_series.copy()
