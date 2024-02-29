@@ -26,6 +26,7 @@ def print_info(files):
 
 
 def count_masked_variable(files, variable):
+    #print(files)
     for f in files:
         nc_obj = nc.Dataset(f)
         var = nc_obj[variable][:]
@@ -83,10 +84,10 @@ def extract_var_array(files, vname, start=0, use_mask=False):
         if i == 0:
             continue
         else:
-            curr_arr = _extract_array_from_nc(files[i], vname)
+            curr_arr = _extract_array_from_nc(files[i], vname, mask=use_mask)
             var = np.vstack((var, curr_arr))
 
-    return var[start:, ]
+    return var #[start:, ]
 
 
 def scale(arr, factor):
