@@ -3,7 +3,6 @@ import datetime
 import netCDF4 as nc
 import numpy as np
 
-# TODO: redo with arrays only; no dicts
 
 def get_files(topdir):
     flist = []
@@ -23,76 +22,6 @@ def print_info(files):
     print("Creating data object from .nc file:")
     print(nc_obj)
     print(nc_obj.variables)
-    pass
-
-
-def create_wind_series(files, variable_series, use_mask=False, start_from=0):
-    series_u = nc.Dataset(files[0]).variables["u10"][:]
-    series_v = nc.Dataset(files[0]).variables["v10"][:]
-
-    series = np.ma.masked_array([series_u, series_v])
-
-    if not use_mask and type(series) == np.ma.masked_array:
-        series = unmask(series)
-
-    series.resize((series_u.shape[0], 2, series_u.shape[1], series_u.shape[2]))
-
-    for i in range(len(files)):
-        if i == 0:
-            continue
-
-        nc_obj = nc.Dataset(files[i])
-
-        var_u = nc_obj.variables["u10"][:]
-        var_v = nc_obj.variables["v10"][:]
-
-        if len(var_u.shape) > 3:
-            var_u = var_u[:,0,:,:]
-
-        if len(var_v.shape) > 3:
-            var_v = var_v[:,0,:,:]
-
-        var = np.ma.masked_array([var_u, var_v])
-
-        if not use_mask and type(var) == np.ma.masked_array:
-            var = unmask(var)
-
-        var.resize((var_u.shape[0], 2, var_u.shape[1], var_u.shape[2]))
-        series = np.vstack((series, var))
-
-    series = series[start_from:, :, :, :]
-    variable_series["wind"] = series
-    pass
-
-
-# TODO: update for level variables
-def create_series(files, variable, variable_series, use_mask=False, start_from=0, levels=False):
-    if variable == "wind":
-        create_wind_series(files, variable_series, use_mask=use_mask, start_from=start_from)
-    else:
-        series = nc.Dataset(files[0]).variables[variable][:]
-
-        if not use_mask and type(series) == np.ma.masked_array:
-            series = unmask(series)
-
-        for i in range(len(files)):
-            if i == 0:
-                continue
-
-            nc_obj = nc.Dataset(files[i])
-            var = nc_obj.variables[variable][:]
-
-            if not use_mask and type(var) == np.ma.masked_array:
-                var = unmask(var)
-
-            # Keep just the ERA5 version, which is index 0 in the 2nd dimension
-            if len(var.shape) > 3:
-                var = var[:,0,:,:]
-
-            series = np.vstack((series, var))
-
-        series = series[start_from:, :, :]
-        variable_series[variable] = series
     pass
 
 
@@ -126,40 +55,75 @@ def get_time(first_date, files, start_from=0):
 
 
 def unmask(arr, use_mean=True, new_val=None):
-    if arr.mask.sum() == 0:
-        return arr.data
+    mask = arr.mask
+
+    if use_mean:
+        mean = np.mean(arr)
+        arr[mask] = mean
     else:
-        mask = arr.mask
+        arr[mask] = new_val
 
-        if use_mean:
-            mean = np.mean(arr)
-            arr[mask] = mean
+    return arr.data
+
+
+def _extract_array_from_nc(file, vname, mask):
+    nc_obj = nc.Dataset(file)
+    var = nc_obj.variables[vname][:]
+
+    if not mask and type(var) == np.ma.masked_array:
+        var = unmask(var)
+
+    return var
+
+
+def extract_var_array(files, vname, start=0, use_mask=False):
+    var = _extract_array_from_nc(files[0], vname, mask=use_mask)
+
+    for i in range(len(files)):
+        if i == 0:
+            continue
         else:
-            arr[mask] = new_val
+            curr_arr = _extract_array_from_nc(files[i], vname)
+            var = np.vstack((var, curr_arr))
 
-        return arr.data
-
-
-def scale_variable(variable_series, variable, factor):
-    scaled = variable_series[variable] * factor
-    variable_series[variable] = scaled
-    return variable_series
+    return var[start:, ]
 
 
-def add_to_variable(variable_series, variable, summand):
-    summed = variable_series[variable] + summand
-    variable_series[variable] = summed
-    return variable_series
+def scale(arr, factor):
+    scaled = arr * factor
+    return scaled
 
 
-def compute_laplacian(var_array, var_name, loc):
+# TODO: test
+def resize(arr, vname, levels=False):
+    print(f"Resizing {vname}.")
+
+    resized = arr.copy()
+
+    if len(arr.shape) == 3 and not levels:  # non-wind, non-leveled variables
+        temp1 = np.repeat(arr, 2, axis=1)
+        temp2 = np.repeat(temp1, 3, axis=2)
+        temp3 = np.pad(temp2, pad_width=((0, 0), (2, 2), (0, 0)), mode="edge")
+        resized = temp3[:, :, 0:64]
+
+    else:  # wind and leveled variables
+        temp1 = np.repeat(arr, 2, axis=2)
+        temp2 = np.repeat(temp1, 3, axis=3)
+        temp3 = np.pad(temp2, pad_width=((0, 0), (0, 0), (2, 2), (0, 0)), mode="edge")
+        resized = temp3[:, :, :, 0:64]
+
+    print(f"{vname} new shape: {resized.shape}")
+    return resized
+
+
+def compute_laplacian(var_array, vname, loc):
 
     assert(len(loc) == 2)
 
-    print("Computing Laplacian for variable " + var_name)
+    print("Computing Laplacian for variable " + vname)
     var_shape = np.array(var_array.shape)
-    row_border = var_shape[1]-1  # 29 or 63
-    col_border = var_shape[2]-1  # 22 or 63
+    row_border = var_shape[-2]-1  # 29 or 63
+    col_border = var_shape[-1]-1  # 22 or 63
 
     try:
         center = var_array[:, loc[0], loc[1]]
@@ -223,85 +187,74 @@ def compute_laplacian(var_array, var_name, loc):
 
     # out of bounds
     else:
-        raise IndexError("The chosen location is out of bounds, please choose indices within " + var_shape[1, 2])
+        raise IndexError("The chosen location is out of bounds, please choose indices within " + var_shape[-2, -1])
 
     laplace = center - np.mean(np.array([north, south, east, west]), axis=0)
     return laplace
 
 
-def resize_variables(variable_series, levels=False):
-    print("Resizing variables.")
-    resized = variable_series.copy()
+def get_level(arr, level):
+    assert arr.shape > 3
 
-    for name, var in resized.items():
-
-        if len(var.shape) == 3 and not levels:  # non-wind variables
-            temp1 = np.repeat(var, 2, axis=1)
-            temp2 = np.repeat(temp1, 3, axis=2)
-            temp3 = np.pad(temp2, pad_width=((0, 0), (2, 2), (0, 0)), mode="edge")
-            resized_img = temp3[:, :, 0:64]
-
-        elif len(var.shape) != 3 and levels:
-            raise NotImplementedError  # TODO: implement
-
-        else:
-            temp1 = np.repeat(var, 2, axis=2)
-            temp2 = np.repeat(temp1, 3, axis=3)
-            temp3 = np.pad(temp2, pad_width=((0, 0), (0, 0), (2, 2), (0, 0)), mode="edge")
-            resized_img = temp3[:, :, :, 0:64]
-
-        resized[name] = resized_img
-        print(name, "new shape:", resized_img.shape)
-    return resized
+    return arr[:, level, :, :]
 
 
-# TODO: update for level variables -> ../r300/, ../r500/, etc
-def save_to_file(outdir, time, variable_series, variable, one_series=True, resized=False, use_mask=False, levels=False):
-    print("Saving data to files in", outdir)
+def _save_to_daily_files(path, time, arr, fname):
+    date_min = time[0]
+    current_date = date_min
+    i = 0
 
-    if one_series:
-        print("Saving one series.")
-        if variable in variable_series.keys():
-            date_min = time[0].strftime("%Y-%m-%d")
-            date_max = time[-1].strftime("%Y-%m-%d")
-            fname = variable + "_" + "6h" + "_" + date_min + "_" + date_max
+    while i < len(arr):
+        fname_day = fname
+        day_arr = arr[i:i + 4, :, :]
+        fname_day += current_date.strftime("%Y%m%d")
+
+        np.save(path + fname_day, day_arr)
+        i += 4
+        current_date = current_date + datetime.timedelta(days=1)
+    pass
+
+
+def save_to_daily_files(outdir, time, arr, vname, resized=False, use_mask=False, levels=None):
+
+    # Save arrays for variables at levels in new folder for each level
+    if levels is not None:
+        assert len(levels) == arr.shape[1]
+
+        for l in range(len(levels)):
+            vname_l = vname
+            vname_l += str(levels[l])
+            parent_dir = outdir + vname_l
 
             if resized:
-                fname += "_resized"
+                parent_dir += "_resized"
+            os.mkdir(parent_dir)
+            print(f"Saving daily arrays to files in {parent_dir}")
 
-            if use_mask:
-                fname += "_masked.npy"
-            else:
-                fname += "_filled.npy"
+            level_arr = arr[:, l, :, :]
 
-            np.save(outdir + fname, variable_series[variable])
+            fname = vname_l + "_"
+            if resized:
+                fname += "resized_"
 
-        else:
-            create_series(variable, variable_series, use_mask)
-            save_to_file(outdir, time, variable_series, variable, one_series, resized, use_mask)
+            _save_to_daily_files(parent_dir + "/", time, level_arr, fname)
+
     else:
-        print("Saving individual daily files.")
-        if variable in variable_series.keys():
-            date_min = time[0]
-            var_series = variable_series[variable]
-            current_date = date_min
-            i = 0
+        parent_dir = outdir + vname
 
-            while i < len(var_series):
-                day_arr = var_series[i:i+4, :, :]
-                fname = variable + "_fullDay_" + current_date.strftime("%Y%m%d")
+        if resized:
+            parent_dir += "_resized"
+        os.mkdir(parent_dir)
+        print(f"Saving daily arrays to files in {parent_dir}")
 
-                if use_mask:
-                    fname += "_masked.npy"
-                else:
-                    fname += "_filled.npy"
+        fname = vname
+        if resized:
+            fname += "_resized"
 
-                np.save(outdir + fname, day_arr)
-                i += 4
-                current_date = current_date + datetime.timedelta(days=1)
-
+        if use_mask:
+            fname += "_masked_"
         else:
-            create_series(variable, variable_series, use_mask)
-            save_to_file(outdir, time, variable_series, variable, one_series, resized, use_mask)
+            fname += "_filled_"
 
-    print("Done.")
+        _save_to_daily_files(parent_dir + "/", time, arr, fname)
+    pass
