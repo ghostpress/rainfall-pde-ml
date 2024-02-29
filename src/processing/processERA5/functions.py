@@ -3,14 +3,17 @@ import datetime
 import netCDF4 as nc
 import numpy as np
 
+# TODO: redo with arrays only; no dicts
 
 def get_files(topdir):
     flist = []
-    files = os.listdir(topdir)
-    files.sort()
 
-    for f in files:
-        flist.append(topdir + f)
+    if len(topdir) > 0:
+        files = os.listdir(topdir)
+        files.sort()
+
+        for f in files:
+            flist.append(topdir + f)
 
     return flist
 
@@ -62,7 +65,8 @@ def create_wind_series(files, variable_series, use_mask=False, start_from=0):
     pass
 
 
-def create_series(files, variable, variable_series, use_mask=False, start_from=0):
+# TODO: update for level variables
+def create_series(files, variable, variable_series, use_mask=False, start_from=0, levels=False):
     if variable == "wind":
         create_wind_series(files, variable_series, use_mask=use_mask, start_from=start_from)
     else:
@@ -225,17 +229,20 @@ def compute_laplacian(var_array, var_name, loc):
     return laplace
 
 
-def resize_variables(variable_series):
+def resize_variables(variable_series, levels=False):
     print("Resizing variables.")
     resized = variable_series.copy()
 
     for name, var in resized.items():
 
-        if len(var.shape) == 3:  # non-wind variables
+        if len(var.shape) == 3 and not levels:  # non-wind variables
             temp1 = np.repeat(var, 2, axis=1)
             temp2 = np.repeat(temp1, 3, axis=2)
             temp3 = np.pad(temp2, pad_width=((0, 0), (2, 2), (0, 0)), mode="edge")
             resized_img = temp3[:, :, 0:64]
+
+        elif len(var.shape) != 3 and levels:
+            raise NotImplementedError  # TODO: implement
 
         else:
             temp1 = np.repeat(var, 2, axis=2)
@@ -248,7 +255,8 @@ def resize_variables(variable_series):
     return resized
 
 
-def save_to_file(outdir, time, variable_series, variable, one_series=True, resized=False, use_mask=False):
+# TODO: update for level variables -> ../r300/, ../r500/, etc
+def save_to_file(outdir, time, variable_series, variable, one_series=True, resized=False, use_mask=False, levels=False):
     print("Saving data to files in", outdir)
 
     if one_series:
