@@ -229,7 +229,12 @@ def save_to_daily_files(outdir, time, arr, vname, resized=False, use_mask=False,
 
             if resized:
                 parent_dir += "_resized"
-            os.mkdir(parent_dir)
+
+            try:
+                os.mkdir(parent_dir)
+            except FileExistsError:
+                print("Variable directory already exists.")
+                
             print(f"Saving daily arrays to files in {parent_dir}")
 
             level_arr = arr[:, l, :, :]
@@ -245,7 +250,11 @@ def save_to_daily_files(outdir, time, arr, vname, resized=False, use_mask=False,
 
         if resized:
             parent_dir += "_resized"
-        os.mkdir(parent_dir)
+        try:
+            os.mkdir(parent_dir)
+        except FileExistsError:
+            print("Variable directory already exists.")
+            
         print(f"Saving daily arrays to files in {parent_dir}")
 
         fname = vname
