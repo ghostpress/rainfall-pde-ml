@@ -10,3 +10,7 @@ tests/
 
 config.txt
 instructions.txt
+src/analysis/*.txt
+
+.Rhistory
+variableSelection.R
