@@ -31,7 +31,7 @@ if __name__ == "__main__":
     firstDay = datetime.datetime(1900, 1, 1, hour=0, minute=0, second=0)  # time units for ERA5 are hours since 1/1/1990
 
     levels = ['300', '500', '600', '700', '850', '925', '950']
-    levels_variables = ["crwc", "q", "r", "t", "u", "w"]
+    levels_variables = ["crwc", "q", "r", "t", "u", "v", "w"]
     single_variables = ["cape", "cin", "d2m", "kx", "sp", "t2m", "tcc", "tclw", "tcwv", "vimd"]
 
     for var in levels_variables:
