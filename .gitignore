@@ -11,6 +11,7 @@ tests/
 config.txt
 instructions.txt
 src/analysis/*.txt
+src/processing/processTIGGE/*.txt
 
 .Rhistory
 variableSelection.R
