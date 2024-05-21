@@ -34,7 +34,7 @@ def send_request(y, m, d):
         "dataset" : "tigge",
         "date"    : f"{y}-{m}-{d}",
         "expver"  : "prod",
-        "grid"    : "0.5/0.5",
+        "grid"    : "0.25/0.25",
         "levtype" : "sfc",
         "origin"  : "ecmf",
         "param"   : "228228",
@@ -42,7 +42,7 @@ def send_request(y, m, d):
         "time"    : "12:00:00",
         "type"    : "cf",
         "format"  : "netcdf",
-        "target"  : f"tigge_precip_download_{y}{m}{d}.nc"  # add directory path as needed
+        "target"  : f"/home/lucia/projects/FORMES/rainfall-pde-ml/data/tigge/tigge_precip_download_{y}{m}{d}.nc"  # add directory path as needed
     })
  
 
