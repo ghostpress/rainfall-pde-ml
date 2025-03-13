@@ -38,12 +38,12 @@ def send_request(y, m, d):
         "levtype" : "sfc",
         "origin"  : "ecmf",
         "param"   : "228228",
-        "step"    : "0/18/24/30",
+        "step"    : "0/18/42",
         "time"    : "12:00:00",
         "type"    : "cf",
         "format"  : "netcdf",
-        "target"  : f"/home/lucia/projects/FORMES/rainfall-pde-ml/data/tigge/tigge_precip_download_{y}{m}{d}.nc"  # add directory path as needed
-    })
+        "target"  : f"/home/lucia/projects/FORMES/rainfall-pde-ml/data/tigge_cf/tigge_precip_ensemble_{y}{m}{d}.nc"  # add directory path as needed
+    })	#"number"  : "1/to/50",  # for perturbed ensemble forecasts only
  
 
 if __name__ == "__main__":

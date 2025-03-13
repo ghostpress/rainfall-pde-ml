@@ -4,7 +4,7 @@ import multiprocessing
 # ------------- SET UP -------------
 
 years = [y for y in range(1990, 2023, 1)]  # 1990-2022
-surface_vars = ['2m_dewpoint_temperature', '2m_temperature', 'convective_available_potential_energy',
+single_vars = ['2m_dewpoint_temperature', '2m_temperature', 'convective_available_potential_energy',
                 'convective_inhibition', 'k_index', 'surface_pressure',
                 'total_cloud_cover', 'total_column_cloud_liquid_water', 'total_column_water_vapour',
                 'vertically_integrated_moisture_divergence']  # add precipitation (hourly) when CDS API updated
@@ -36,9 +36,7 @@ def download_variable(var, levs=None):
             print(f"Requesting variable {var} for years {fsuff} on surface.")
 
             c.retrieve('reanalysis-era5-single-levels',
-                       {'product_type': 'reanalysis',
-                        'format': 'netcdf',
-                        'area': geo,
+                       {'product_type': ['reanalysis'],
                         'variable': [var],
                         'year': subset,
                         'month': ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
@@ -46,6 +44,9 @@ def download_variable(var, levs=None):
                                 '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28',
                                 '29', '30', '31'],
                         'time': times,
+                        'data_format': 'netcdf',
+                        'download_format': 'unarchived',
+                        'area': geo,                        
                         },
                        destination_path + var + '_download_' + fsuff + '.nc')
 
